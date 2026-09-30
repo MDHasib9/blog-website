@@ -135,7 +135,7 @@ export function Navbar() {
                 "text-sm font-medium transition-colors hover:text-primary",
                 pathname === link.href
                   ? "text-primary"
-                  : "text-muted-foreground"
+                  : "text-muted-foreground",
               )}
             >
               {link.label}
@@ -154,7 +154,12 @@ export function Navbar() {
 
           {/* Write button (logged in) */}
           {user && (
-            <Button variant="ghost" size="icon" asChild className="hidden sm:flex">
+            <Button
+              variant="ghost"
+              size="icon"
+              asChild
+              className="hidden sm:flex"
+            >
               <Link href="/write">
                 <PenSquare className="h-5 w-5" />
               </Link>
@@ -231,7 +236,10 @@ export function Navbar() {
                   </>
                 )}
                 <DropdownMenuSeparator />
-                <DropdownMenuItem onClick={handleLogout} className="text-red-600">
+                <DropdownMenuItem
+                  onClick={handleLogout}
+                  className="text-red-600"
+                >
                   <LogOut className="mr-2 h-4 w-4" />
                   Log out
                 </DropdownMenuItem>
@@ -240,15 +248,15 @@ export function Navbar() {
           ) : (
             <div className="hidden sm:flex items-center gap-2">
               <Button variant="ghost" asChild>
-                <Link href="/login">Log in</Link>
+                <Link href="/auth/login">Log in</Link>
               </Button>
               <Button asChild>
-                <Link href="/signup">Sign up</Link>
+                <Link href="/auth/sign-up">Sign up</Link>
               </Button>
             </div>
           )}
 
-          <ModeToggle/>
+          <ModeToggle />
           {/* Mobile menu */}
           <Sheet open={mobileOpen} onOpenChange={setMobileOpen}>
             <SheetTrigger asChild className="md:hidden">
@@ -321,12 +329,18 @@ export function Navbar() {
                 ) : (
                   <>
                     <Button asChild variant="outline">
-                      <Link href="/login" onClick={() => setMobileOpen(false)}>
+                      <Link
+                        href="/auth/login"
+                        onClick={() => setMobileOpen(false)}
+                      >
                         Log in
                       </Link>
                     </Button>
                     <Button asChild>
-                      <Link href="/signup" onClick={() => setMobileOpen(false)}>
+                      <Link
+                        href="/auth/sign-up"
+                        onClick={() => setMobileOpen(false)}
+                      >
                         Sign up
                       </Link>
                     </Button>
