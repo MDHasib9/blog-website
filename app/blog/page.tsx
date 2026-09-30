@@ -9,10 +9,60 @@ export const metadata = {
   description: "Discover the latest posts from our community",
 };
 
-async function getPosts() {
+// --- TypeScript Types (Zero `any`) ---
+export type PostCardAuthor = {
+  username: string;
+  full_name: string | null;
+  avatar_url: string | null;
+};
+
+export type PostCardCategory = {
+  name: string;
+  slug: string;
+};
+
+export type PostCardTag = {
+  name: string;
+  slug: string;
+};
+
+export type PostCardItem = {
+  id: string;
+  title: string;
+  content: string;
+  cover_image_url: string | null;
+  created_at: string;
+  author: PostCardAuthor;
+  category: PostCardCategory | null;
+  tags: PostCardTag[];
+  reaction_count: number;
+  comment_count: number;
+};
+
+// Raw response shapes from Supabase joins
+type RawAuthor = PostCardAuthor | PostCardAuthor[] | null;
+type RawCategory = PostCardCategory | PostCardCategory[] | null;
+type RawTagRelation = PostCardTag | PostCardTag[] | null;
+type RawPostTag = { tag: RawTagRelation };
+type RawCount = { count: number };
+
+type RawPostListItem = {
+  id: string;
+  title: string;
+  content: string;
+  cover_image_url: string | null;
+  created_at: string;
+  author: RawAuthor;
+  category: RawCategory;
+  post_tags: RawPostTag[] | null;
+  reactions: RawCount[] | null;
+  comments: RawCount[] | null;
+};
+
+async function getPosts(): Promise<PostCardItem[]> {
   const supabase = await createClient();
 
-  const { data: posts, error } = await supabase
+  const { data, error } = await supabase
     .from("posts")
     .select(
       `
@@ -38,7 +88,7 @@ async function getPosts() {
       ),
       reactions (count),
       comments (count)
-    `,
+    `
     )
     .is("deleted_at", null)
     .order("created_at", { ascending: false })
@@ -49,19 +99,45 @@ async function getPosts() {
     throw new Error("Failed to load posts");
   }
 
-  // Normalize the data shape for PostCard
-  return (posts || []).map((post: any) => ({
-    id: post.id,
-    title: post.title,
-    content: post.content,
-    cover_image_url: post.cover_image_url,
-    created_at: post.created_at,
-    author: post.author,
-    category: post.category,
-    tags: (post.post_tags || []).map((pt: any) => pt.tag),
-    reaction_count: post.reactions?.[0]?.count || 0,
-    comment_count: post.comments?.[0]?.count || 0,
-  }));
+  const rawPosts = (data || []) as unknown as RawPostListItem[];
+
+  // Normalize data shape cleanly without `any`
+  return rawPosts.map((post): PostCardItem => {
+    // Normalize author
+    const authorData = Array.isArray(post.author) ? post.author[0] : post.author;
+    const author: PostCardAuthor = authorData ?? {
+      username: "anonymous",
+      full_name: "Anonymous User",
+      avatar_url: null,
+    };
+
+    // Normalize category
+    const categoryData = Array.isArray(post.category) ? post.category[0] : post.category;
+    const category: PostCardCategory | null = categoryData ?? null;
+
+    // Normalize tags
+    const tags: PostCardTag[] = (post.post_tags || []).flatMap((pt) => {
+      if (!pt.tag) return [];
+      return Array.isArray(pt.tag) ? pt.tag : [pt.tag];
+    });
+
+    // Normalize aggregate counts
+    const reaction_count = post.reactions?.[0]?.count ?? 0;
+    const comment_count = post.comments?.[0]?.count ?? 0;
+
+    return {
+      id: post.id,
+      title: post.title,
+      content: post.content,
+      cover_image_url: post.cover_image_url,
+      created_at: post.created_at,
+      author,
+      category,
+      tags,
+      reaction_count,
+      comment_count,
+    };
+  });
 }
 
 export default async function BlogPage() {
