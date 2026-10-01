@@ -26,7 +26,7 @@ async function getActiveUser() {
     error: authError,
   } = await supabase.auth.getUser();
 
-  if (authError) {
+  if (authError && authError.name !== "AuthSessionMissingError") {
     console.error("Error verifying community action user:", authError);
     return { supabase, error: "Could not verify your account. Please try again." };
   }
@@ -131,7 +131,7 @@ export async function toggleFollow(
 
   const { data: target, error: targetError } = await supabase
     .from("profiles")
-    .select("id")
+    .select("id, is_banned, deleted_at")
     .eq("id", parsedTarget.data)
     .maybeSingle();
 
@@ -139,7 +139,9 @@ export async function toggleFollow(
     console.error("Error checking follow target:", targetError);
     return { error: "Could not load this profile. Please try again." };
   }
-  if (!target) return { error: "This profile is no longer available." };
+  if (!target || target.is_banned || target.deleted_at) {
+    return { error: "This profile is no longer available." };
+  }
 
   const { data: existing, error: followError } = await supabase
     .from("follows")

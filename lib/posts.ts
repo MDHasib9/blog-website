@@ -55,6 +55,7 @@ type PostFeedOptions = {
   search?: string;
   category?: string;
   authorId?: string;
+  authorIds?: string[];
   postIds?: string[];
   page?: number;
   pageSize?: number;
@@ -64,10 +65,12 @@ export async function getPostFeed({
   search,
   category,
   authorId,
+  authorIds,
   postIds,
   page = 1,
   pageSize = 24,
 }: PostFeedOptions = {}): Promise<{ posts: PostCardItem[]; total: number }> {
+  if (authorIds && authorIds.length === 0) return { posts: [], total: 0 };
   if (postIds && postIds.length === 0) return { posts: [], total: 0 };
 
   const supabase = await createClient();
@@ -105,6 +108,10 @@ export async function getPostFeed({
 
   if (authorId) {
     query = query.eq("author_id", authorId);
+  }
+
+  if (authorIds) {
+    query = query.in("author_id", authorIds);
   }
 
   if (postIds) {

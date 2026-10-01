@@ -26,6 +26,7 @@ import {
   Bell,
   ShieldCheck,
   Users,
+  UserRoundPen,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { ModeToggle } from "./theme/mode-toggle";
@@ -116,6 +117,36 @@ export function Navbar() {
       subscription.unsubscribe();
     };
   }, [supabase]);
+
+  useEffect(() => {
+    const userId = user?.id;
+    if (
+      !userId ||
+      (!pathname.startsWith("/profile/") && pathname !== "/settings/profile")
+    ) {
+      return;
+    }
+
+    let isMounted = true;
+    const refreshProfile = async () => {
+      const { data, error } = await supabase
+        .from("profiles")
+        .select("id, username, full_name, avatar_url, role")
+        .eq("id", userId)
+        .single();
+
+      if (error) {
+        console.error("Error refreshing navigation profile:", error);
+      } else if (isMounted) {
+        setProfile(data);
+      }
+    };
+
+    void refreshProfile();
+    return () => {
+      isMounted = false;
+    };
+  }, [pathname, supabase, user?.id]);
 
   const handleLogout = async () => {
     await supabase.auth.signOut();
@@ -215,12 +246,20 @@ export function Navbar() {
                 </DropdownMenuLabel>
                 <DropdownMenuSeparator />
                 {profile?.username && (
-                  <DropdownMenuItem asChild>
-                    <Link href={`/profile/${encodeURIComponent(profile.username)}`}>
-                      <User className="mr-2 h-4 w-4" />
-                      Profile
-                    </Link>
-                  </DropdownMenuItem>
+                  <>
+                    <DropdownMenuItem asChild>
+                      <Link href={`/profile/${encodeURIComponent(profile.username)}`}>
+                        <User className="mr-2 h-4 w-4" />
+                        Profile
+                      </Link>
+                    </DropdownMenuItem>
+                    <DropdownMenuItem asChild>
+                      <Link href="/settings/profile">
+                        <UserRoundPen className="mr-2 h-4 w-4" />
+                        Edit profile
+                      </Link>
+                    </DropdownMenuItem>
+                  </>
                 )}
                 <DropdownMenuItem asChild>
                   <Link href="/bookmarks">
@@ -309,13 +348,22 @@ export function Navbar() {
                       Write
                     </Link>
                     {profile?.username && (
-                      <Link
-                        href={`/profile/${encodeURIComponent(profile.username)}`}
-                        onClick={() => setMobileOpen(false)}
-                        className="text-lg font-medium"
-                      >
-                        My profile
-                      </Link>
+                      <>
+                        <Link
+                          href={`/profile/${encodeURIComponent(profile.username)}`}
+                          onClick={() => setMobileOpen(false)}
+                          className="text-lg font-medium"
+                        >
+                          My profile
+                        </Link>
+                        <Link
+                          href="/settings/profile"
+                          onClick={() => setMobileOpen(false)}
+                          className="text-lg font-medium"
+                        >
+                          Edit profile
+                        </Link>
+                      </>
                     )}
                     <Link
                       href="/bookmarks"

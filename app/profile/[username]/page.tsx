@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Button } from "@/components/ui/button";
 import { PostCard } from "@/components/posts/post-card";
 import { createClient } from "@/lib/server";
 import { getPostFeed } from "@/lib/posts";
@@ -69,7 +70,7 @@ export default async function ProfilePage({ params }: Props) {
     error: authError,
   } = await supabase.auth.getUser();
 
-  if (authError) {
+  if (authError && authError.name !== "AuthSessionMissingError") {
     console.error("Error verifying profile viewer:", authError);
     throw new Error("Could not verify your account.");
   }
@@ -140,9 +141,14 @@ export default async function ProfilePage({ params }: Props) {
             {followerCount ?? 0} followers · {followingCount ?? 0} following
           </p>
           {user?.id === profile.id ? (
-            <p className="mt-4 text-sm text-muted-foreground">
-              This is your public profile.
-            </p>
+            <div className="mt-4 flex flex-wrap items-center gap-3">
+              <Button size="sm" asChild>
+                <Link href="/settings/profile">Edit profile</Link>
+              </Button>
+              <p className="text-sm text-muted-foreground">
+                This is your public profile.
+              </p>
+            </div>
           ) : user ? (
             <div className="mt-4">
               <FollowButton

@@ -6,6 +6,7 @@ Blogify is a community blogging site built with Next.js 16, React 19, TypeScript
 
 - Public story feed with search, topic filters, and pagination
 - Public author profiles and profile story lists
+- Editable display names, usernames, profile photos, and bios
 - Email/password sign-up, sign-in, email confirmation, and password reset
 - Rich-text story publishing with image uploads
 - Author-only story editing and soft deletion
@@ -50,14 +51,16 @@ Only public Supabase credentials belong in these variables. Never put a Supabase
 
 ### Supabase prerequisites
 
-The app expects an existing Supabase project with the `profiles`, `posts`, `categories`, `tags`, `post_tags`, `reactions`, `comments`, `bookmarks`, `follows`, `notifications`, and `reports` tables, the `user_role`, `reaction_type`, `notification_type`, and `report_status` enums, and the row-level security policies required by the app's public reads and authenticated mutations. It also expects a public `post-images` Storage bucket with policies that allow signed-in users to upload to their own user-ID folder.
+The app expects an existing Supabase project with the `profiles`, `posts`, `categories`, `tags`, `post_tags`, `reactions`, `comments`, `bookmarks`, `notifications`, and `reports` tables, the `user_role`, `reaction_type`, `notification_type`, and `report_status` enums, and the row-level security policies required by the app's public reads and authenticated mutations. The author-follow migration creates or secures the `follows` table. It also expects a public `post-images` Storage bucket with policies that allow signed-in users to upload to their own user-ID folder.
 
 The migrations in `supabase/migrations` assume that schema already exists. Review and run them in order in the Supabase SQL Editor before enabling social notifications and admin moderation:
 
 1. `20261001000100_secure_community_notifications.sql` replaces direct notification inserts with database-generated notifications for follows, reactions, comments, replies, and reports.
 2. `20261001000200_protect_profile_privileges.sql` prevents non-admin users from changing their own role, ban, or deletion fields. This is important because the supplied self-update RLS policy alone does not restrict which profile columns a user can update.
+3. `20261001000300_secure_author_follows.sql` creates or secures the `follows` table, enforces unique, non-self follow relationships, installs owner-only follow/unfollow RLS policies, and ensures a follow creates an in-app notification. It assumes the existing `profiles` and `notifications` tables and their referenced columns are present.
+4. `20261001000400_secure_profile_customization.sql` adds case-insensitive username uniqueness so profile edits cannot claim another account's username. It stops with a clear error if existing usernames contain duplicates that differ only by case.
 
-Ensure at least one trusted administrator is assigned `role = 'admin'` in `profiles` using the Supabase SQL Editor; do not expose an admin-role editor in the client. Verify all RLS policies and Storage policies against the project before launch. Configure Supabase Auth's site URL and allowed redirect URLs for local development and each deployed domain; the app completes confirmation and password-reset callbacks through `/auth/confirm`.
+The profile editor uses the existing `Users can update own profile` row-level policy and uploads avatars to the existing public `post-images` bucket under each user's own ID folder. Ensure its Storage policies permit uploads beneath `<user-id>/`. Ensure at least one trusted administrator is assigned `role = 'admin'` in `profiles` using the Supabase SQL Editor; do not expose an admin-role editor in the client. Verify all RLS policies and Storage policies against the project before launch. Configure Supabase Auth's site URL and allowed redirect URLs for local development and each deployed domain; the app completes confirmation and password-reset callbacks through `/auth/confirm`.
 
 ## Validation
 
