@@ -7,10 +7,12 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { formatDistanceToNow } from "date-fns";
 import { PostActions } from "@/components/posts/post-actions";
+import { ShareButton } from "@/components/posts/share-button";
 import { CommentSection } from "@/components/posts/comment-section";
 import { DeletePostButton } from "@/components/posts/delete-post-button";
 import { postIdParamSchema } from "@/lib/zod";
 import { sanitizePostContent } from "@/lib/sanitize-post-content";
+import { ArrowLeft, BookOpen, Clock3 } from "lucide-react";
 
 // --- Reaction & Data Types ---
 export type ReactionType =
@@ -272,113 +274,248 @@ export default async function SinglePostPage({ params }: Props) {
 
   const isAuthor = user?.id === post.author_id;
   const authorName = post.author.full_name || post.author.username || "Anonymous";
+  const wordCount = post.content
+    .replace(/<[^>]*>/g, " ")
+    .replace(/&nbsp;/g, " ")
+    .trim()
+    .split(/\s+/)
+    .filter(Boolean).length;
+  const readingMinutes = Math.max(1, Math.ceil(wordCount / 220));
+  const publishedDate = new Intl.DateTimeFormat("en", {
+    month: "long",
+    day: "numeric",
+    year: "numeric",
+  }).format(new Date(post.created_at));
 
   return (
-    <article className="container mx-auto max-w-3xl px-4 py-10">
-      {/* Header */}
-      <header className="mb-8">
-        {post.category && (
-          <Badge variant="secondary" className="mb-4">
-            {post.category.name}
-          </Badge>
+    <div className="min-h-screen bg-background">
+      <article className="mx-auto max-w-6xl px-4 pb-16 pt-8 sm:px-6 sm:pt-12">
+        <div className="mx-auto max-w-4xl">
+          <Link
+            href="/blog"
+            className="mb-10 inline-flex items-center gap-2 text-sm font-medium text-muted-foreground transition-colors hover:text-foreground"
+          >
+            <ArrowLeft className="h-4 w-4" />
+            Back to stories
+          </Link>
+
+          <header className="mb-10">
+            <div className="mb-6 flex flex-wrap items-center gap-3">
+              {post.category && (
+                <Link
+                  href={`/blog?category=${encodeURIComponent(post.category.slug)}`}
+                  className="rounded-full border border-primary/20 bg-primary/[0.06] px-3 py-1 text-xs font-semibold uppercase tracking-[0.16em] text-primary transition-colors hover:bg-primary/10"
+                >
+                  {post.category.name}
+                </Link>
+              )}
+              <span className="h-1 w-1 rounded-full bg-muted-foreground/50" />
+              <span className="text-xs font-medium uppercase tracking-[0.16em] text-muted-foreground">
+                {publishedDate}
+              </span>
+            </div>
+
+            <h1 className="max-w-4xl break-words font-serif text-4xl font-semibold leading-[1.08] tracking-tight text-foreground sm:text-5xl md:text-6xl lg:text-7xl">
+              {post.title}
+            </h1>
+
+            <div className="mt-8 flex flex-wrap items-center justify-between gap-5 border-y py-5">
+              <div className="flex min-w-0 items-center gap-3">
+                <Avatar className="h-12 w-12 ring-2 ring-background">
+                  <AvatarImage src={post.author.avatar_url || ""} alt={authorName} />
+                  <AvatarFallback className="bg-primary/10 font-semibold text-primary">
+                    {post.author.full_name?.[0] || post.author.username?.[0] || "U"}
+                  </AvatarFallback>
+                </Avatar>
+                <div className="min-w-0">
+                  {post.author.username ? (
+                    <Link
+                      href={`/profile/${encodeURIComponent(post.author.username)}`}
+                      className="font-semibold decoration-primary/40 underline-offset-4 hover:underline"
+                    >
+                      {authorName}
+                    </Link>
+                  ) : (
+                    <p className="font-semibold">{authorName}</p>
+                  )}
+                  <div className="mt-1 flex flex-wrap items-center gap-x-2 text-xs text-muted-foreground">
+                    <span>
+                      {formatDistanceToNow(new Date(post.created_at), {
+                        addSuffix: true,
+                      })}
+                    </span>
+                    <span aria-hidden="true">·</span>
+                    <span className="inline-flex items-center gap-1">
+                      <Clock3 className="h-3.5 w-3.5" />
+                      {readingMinutes} min read
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-2">
+                <ShareButton title={post.title} />
+                {isAuthor && (
+                  <>
+                    <Button variant="outline" size="sm" asChild>
+                      <Link href={`/posts/${post.id}/edit`}>Edit story</Link>
+                    </Button>
+                    <DeletePostButton postId={post.id} />
+                  </>
+                )}
+              </div>
+            </div>
+          </header>
+        </div>
+
+        {post.cover_image_url && (
+          <figure className="relative mx-auto mb-14 aspect-[16/9] max-h-[660px] overflow-hidden rounded-2xl border bg-muted shadow-xl shadow-black/5 sm:rounded-3xl">
+            <Image
+              src={post.cover_image_url}
+              alt={post.title}
+              fill
+              className="object-cover"
+              priority
+              sizes="(max-width: 768px) 100vw, (max-width: 1200px) 92vw, 1152px"
+            />
+          </figure>
         )}
 
-        <h1 className="text-3xl font-bold tracking-tight sm:text-4xl lg:text-5xl">
-          {post.title}
-        </h1>
+        <div className="mx-auto grid max-w-6xl grid-cols-1 gap-10 lg:grid-cols-[minmax(0,1fr)_15rem] lg:gap-16">
+          <div className="mx-auto w-full max-w-3xl">
+            <div
+              className="prose prose-neutral max-w-none break-words text-[1.075rem] leading-[1.9] dark:prose-invert sm:text-lg prose-headings:font-serif prose-headings:font-semibold prose-headings:tracking-tight prose-h2:mt-12 prose-h2:text-3xl prose-h3:mt-10 prose-a:font-medium prose-a:text-primary prose-a:decoration-primary/40 prose-a:underline-offset-4 hover:prose-a:decoration-primary prose-blockquote:border-l-primary/50 prose-blockquote:font-serif prose-blockquote:text-xl prose-img:my-10 prose-img:rounded-2xl prose-pre:rounded-2xl prose-pre:border prose-pre:bg-muted/70"
+              dangerouslySetInnerHTML={{
+                __html: sanitizePostContent(post.content),
+              }}
+            />
 
-        <div className="mt-6 flex items-center justify-between gap-4">
-          <div className="flex items-center gap-3">
-            <Avatar className="h-11 w-11">
-              <AvatarImage
-                src={post.author.avatar_url || ""}
-                alt={authorName}
-              />
-              <AvatarFallback>
-                {post.author.full_name?.[0] || post.author.username?.[0] || "U"}
-              </AvatarFallback>
-            </Avatar>
-            <div className="min-w-0">
-              {post.author.username ? (
-                <Link
-                  href={`/profile/${encodeURIComponent(post.author.username)}`}
-                  className="font-medium hover:underline"
-                >
-                  {authorName}
-                </Link>
-              ) : (
-                <p className="font-medium">{authorName}</p>
-              )}
-              <p className="text-sm text-muted-foreground">
-                {formatDistanceToNow(new Date(post.created_at), {
-                  addSuffix: true,
-                })}
-              </p>
-            </div>
+            {post.tags.length > 0 && (
+              <div className="mt-12 flex flex-wrap items-center gap-2 border-t pt-7">
+                <span className="mr-1 text-xs font-semibold uppercase tracking-[0.15em] text-muted-foreground">
+                  Filed under
+                </span>
+                {post.tags.map((tag) => (
+                  <Badge
+                    key={tag.id}
+                    variant="outline"
+                    className="rounded-full px-3 py-1 font-medium"
+                  >
+                    #{tag.name}
+                  </Badge>
+                ))}
+              </div>
+            )}
+
+            <section className="mt-12 rounded-2xl border bg-card p-5 sm:p-7">
+              <div className="flex items-start gap-4">
+                <Avatar className="h-14 w-14 shrink-0">
+                  <AvatarImage src={post.author.avatar_url || ""} alt={authorName} />
+                  <AvatarFallback className="bg-primary/10 text-lg font-semibold text-primary">
+                    {post.author.full_name?.[0] || post.author.username?.[0] || "U"}
+                  </AvatarFallback>
+                </Avatar>
+                <div className="min-w-0 flex-1">
+                  <p className="text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground">
+                    Written by
+                  </p>
+                  {post.author.username ? (
+                    <Link
+                      href={`/profile/${encodeURIComponent(post.author.username)}`}
+                      className="mt-1 inline-block text-lg font-semibold hover:underline"
+                    >
+                      {authorName}
+                    </Link>
+                  ) : (
+                    <p className="mt-1 text-lg font-semibold">{authorName}</p>
+                  )}
+                  {post.author.bio && (
+                    <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
+                      {post.author.bio}
+                    </p>
+                  )}
+                </div>
+                {post.author.username && (
+                  <Button variant="outline" size="sm" className="shrink-0" asChild>
+                    <Link
+                      href={`/profile/${encodeURIComponent(post.author.username)}`}
+                    >
+                      Profile
+                    </Link>
+                  </Button>
+                )}
+              </div>
+            </section>
           </div>
 
-          {isAuthor && (
-            <div className="flex items-center gap-2">
-              <Button variant="outline" size="sm" asChild>
-                <Link href={`/posts/${post.id}/edit`}>Edit</Link>
-              </Button>
-              <DeletePostButton postId={post.id} />
+          <aside className="lg:pt-2">
+            <div className="space-y-4 lg:sticky lg:top-8">
+              <div className="rounded-2xl border bg-card p-5">
+                <div className="mb-4 flex items-center gap-2 text-sm font-semibold">
+                  <BookOpen className="h-4 w-4 text-primary" />
+                  About this story
+                </div>
+                <dl className="space-y-3 text-sm">
+                  <div className="flex items-center justify-between gap-3">
+                    <dt className="text-muted-foreground">Reading time</dt>
+                    <dd className="font-medium">{readingMinutes} min</dd>
+                  </div>
+                  <div className="flex items-center justify-between gap-3">
+                    <dt className="text-muted-foreground">Responses</dt>
+                    <dd className="font-medium">{post.commentCount}</dd>
+                  </div>
+                  <div className="flex items-center justify-between gap-3">
+                    <dt className="text-muted-foreground">Reactions</dt>
+                    <dd className="font-medium">{post.totalReactions}</dd>
+                  </div>
+                </dl>
+              </div>
+              <div className="rounded-2xl border bg-muted/40 p-5">
+                <p className="text-sm font-semibold">Enjoyed this story?</p>
+                <p className="mt-1 text-sm leading-relaxed text-muted-foreground">
+                  Save it for later or share it with someone who would appreciate it.
+                </p>
+                <div className="mt-4">
+                  <ShareButton title={post.title} label="Share this story" />
+                </div>
+              </div>
             </div>
-          )}
+          </aside>
         </div>
-      </header>
 
-      {/* Cover Image */}
-      {post.cover_image_url && (
-        <div className="relative mb-10 aspect-video overflow-hidden rounded-xl">
-          <Image
-            src={post.cover_image_url}
-            alt={post.title}
-            fill
-            className="object-cover"
-            priority
-            sizes="(max-width: 768px) 100vw, 768px"
+        <div className="mx-auto mt-12 max-w-6xl border-t pt-7">
+          <PostActions
+            postId={post.id}
+            initialCounts={post.reactionCounts}
+            totalReactions={post.totalReactions}
+            commentCount={post.commentCount}
+            currentUserId={user?.id}
+            userReaction={post.userReaction}
+            postAuthorId={post.author_id}
+            initiallySaved={post.isBookmarked}
           />
         </div>
-      )}
 
-      {/* Content */}
-      <div
-        className="prose prose-neutral dark:prose-invert max-w-none prose-headings:font-semibold prose-a:text-primary prose-img:rounded-lg"
-        dangerouslySetInnerHTML={{
-          __html: sanitizePostContent(post.content),
-        }}
-      />
-
-      {/* Tags */}
-      {post.tags.length > 0 && (
-        <div className="mt-10 flex flex-wrap gap-2">
-          {post.tags.map((tag) => (
-            <Badge key={tag.id} variant="outline">
-              #{tag.name}
-            </Badge>
-          ))}
-        </div>
-      )}
-
-      {/* Reactions + Actions */}
-      <div className="mt-10 border-t pt-8">
-        <PostActions
-          postId={post.id}
-          initialCounts={post.reactionCounts}
-          totalReactions={post.totalReactions}
-          commentCount={post.commentCount}
-          currentUserId={user?.id}
-          userReaction={post.userReaction}
-          postAuthorId={post.author_id}
-          initiallySaved={post.isBookmarked}
-        />
-      </div>
-
-      {/* Comments */}
-      <div id="comments" className="mt-12 border-t pt-10">
-        <CommentSection postId={post.id} currentUserId={user?.id} />
-      </div>
-    </article>
+        <section
+          id="comments"
+          className="mx-auto mt-14 max-w-4xl scroll-mt-8 border-t pt-10 sm:pt-14"
+        >
+          <div className="mb-8 flex items-end justify-between gap-4">
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-primary">
+                Join the conversation
+              </p>
+              <h2 className="mt-2 font-serif text-3xl font-semibold tracking-tight sm:text-4xl">
+                Reader responses
+              </h2>
+            </div>
+            <span className="rounded-full bg-muted px-3 py-1 text-sm font-medium text-muted-foreground">
+              {post.commentCount}
+            </span>
+          </div>
+          <CommentSection postId={post.id} currentUserId={user?.id} />
+        </section>
+      </article>
+    </div>
   );
 }
