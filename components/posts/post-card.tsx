@@ -3,7 +3,9 @@ import Image from "next/image";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { MessageCircle, Heart } from "lucide-react";
-import { formatDistanceToNow } from "date-fns"; 
+import { formatDistanceToNow } from "date-fns";
+import { FollowButton } from "@/components/profile/follow-button";
+import { Button } from "@/components/ui/button";
 
 type PostCardProps = {
   post: {
@@ -13,10 +15,13 @@ type PostCardProps = {
     cover_image_url: string | null;
     created_at: string;
     author: {
+      id: string;
       username: string | null;
       full_name: string | null;
       avatar_url: string | null;
+      isFollowing: boolean;
     };
+    viewerId: string | null;
     category: {
       name: string;
       slug: string;
@@ -113,35 +118,58 @@ export function PostCard({ post }: PostCardProps) {
         )}
 
         {/* Author + Stats */}
-        <div className="mt-auto flex items-center justify-between border-t pt-4">
-          <div className="flex min-w-0 items-center gap-2.5">
-            <Avatar className="h-8 w-8">
-              <AvatarImage src={post.author.avatar_url || ""} alt={authorName} />
-              <AvatarFallback>
-                {post.author.full_name?.[0] || post.author.username?.[0] || "U"}
-              </AvatarFallback>
-            </Avatar>
-            {post.author.username ? (
-              <Link
-                href={`/profile/${encodeURIComponent(post.author.username)}`}
-                className="truncate text-sm font-medium transition-opacity hover:opacity-80"
-              >
-                {authorName}
-              </Link>
-            ) : (
-              <span className="truncate text-sm font-medium">{authorName}</span>
-            )}
-          </div>
+        <div className="mt-auto border-t pt-4">
+          <div className="flex items-center justify-between gap-3">
+            <div className="flex min-w-0 flex-1 items-center gap-2.5">
+              <Avatar className="h-8 w-8">
+                <AvatarImage src={post.author.avatar_url || ""} alt={authorName} />
+                <AvatarFallback>
+                  {post.author.full_name?.[0] || post.author.username?.[0] || "U"}
+                </AvatarFallback>
+              </Avatar>
+              <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
+                {post.author.username ? (
+                  <Link
+                    href={`/profile/${encodeURIComponent(post.author.username)}`}
+                    className="truncate text-sm font-medium transition-opacity hover:opacity-80"
+                  >
+                    {authorName}
+                  </Link>
+                ) : (
+                  <span className="truncate text-sm font-medium">{authorName}</span>
+                )}
+                {post.author.username && post.author.id !== post.viewerId && (
+                  post.viewerId ? (
+                    <FollowButton
+                      userId={post.author.id}
+                      initiallyFollowing={post.author.isFollowing}
+                      size="sm"
+                    />
+                  ) : (
+                    <Button asChild variant="outline" size="sm">
+                      <Link
+                        href={`/auth/login?next=${encodeURIComponent(
+                          `/profile/${post.author.username}`,
+                        )}`}
+                      >
+                        Sign in to follow
+                      </Link>
+                    </Button>
+                  )
+                )}
+              </div>
+            </div>
 
-          <div className="flex items-center gap-3 text-sm text-muted-foreground">
-            <span className="flex items-center gap-1">
-              <Heart className="h-4 w-4" />
-              {post.reaction_count}
-            </span>
-            <span className="flex items-center gap-1">
-              <MessageCircle className="h-4 w-4" />
-              {post.comment_count}
-            </span>
+            <div className="flex items-center gap-3 text-sm text-muted-foreground">
+              <span className="flex items-center gap-1">
+                <Heart className="h-4 w-4" />
+                {post.reaction_count}
+              </span>
+              <span className="flex items-center gap-1">
+                <MessageCircle className="h-4 w-4" />
+                {post.comment_count}
+              </span>
+            </div>
           </div>
         </div>
       </div>

@@ -10,6 +10,7 @@ import { PostActions } from "@/components/posts/post-actions";
 import { ShareButton } from "@/components/posts/share-button";
 import { CommentSection } from "@/components/posts/comment-section";
 import { DeletePostButton } from "@/components/posts/delete-post-button";
+import { FollowButton } from "@/components/profile/follow-button";
 import { postIdParamSchema } from "@/lib/zod";
 import { sanitizePostContent } from "@/lib/sanitize-post-content";
 import { ArrowLeft, BookOpen, Clock3 } from "lucide-react";
@@ -273,6 +274,24 @@ export default async function SinglePostPage({ params }: Props) {
   if (!post) notFound();
 
   const isAuthor = user?.id === post.author_id;
+  let isFollowing = false;
+
+  if (user && !isAuthor) {
+    const { data: follow, error: followError } = await supabase
+      .from("follows")
+      .select("follower_id")
+      .eq("follower_id", user.id)
+      .eq("following_id", post.author_id)
+      .maybeSingle();
+
+    if (followError) {
+      console.error("Error checking post author follow:", followError);
+      throw new Error("Failed to load post.");
+    }
+
+    isFollowing = Boolean(follow);
+  }
+
   const authorName = post.author.full_name || post.author.username || "Anonymous";
   const wordCount = post.content
     .replace(/<[^>]*>/g, " ")
@@ -328,16 +347,38 @@ export default async function SinglePostPage({ params }: Props) {
                   </AvatarFallback>
                 </Avatar>
                 <div className="min-w-0">
-                  {post.author.username ? (
-                    <Link
-                      href={`/profile/${encodeURIComponent(post.author.username)}`}
-                      className="font-semibold decoration-primary/40 underline-offset-4 hover:underline"
-                    >
-                      {authorName}
-                    </Link>
-                  ) : (
-                    <p className="font-semibold">{authorName}</p>
-                  )}
+                  <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
+                    {post.author.username ? (
+                      <Link
+                        href={`/profile/${encodeURIComponent(post.author.username)}`}
+                        className="font-semibold decoration-primary/40 underline-offset-4 hover:underline"
+                      >
+                        {authorName}
+                      </Link>
+                    ) : (
+                      <p className="font-semibold">{authorName}</p>
+                    )}
+                    {!isAuthor &&
+                      (user ? (
+                        <FollowButton
+                          userId={post.author_id}
+                          initiallyFollowing={isFollowing}
+                          size="sm"
+                        />
+                      ) : (
+                        <Button asChild variant="outline" size="sm">
+                          <Link
+                            href={`/auth/login?next=${encodeURIComponent(
+                              post.author.username
+                                ? `/profile/${post.author.username}`
+                                : `/blog/${post.id}`,
+                            )}`}
+                          >
+                            Sign in to follow
+                          </Link>
+                        </Button>
+                      ))}
+                  </div>
                   <div className="mt-1 flex flex-wrap items-center gap-x-2 text-xs text-muted-foreground">
                     <span>
                       {formatDistanceToNow(new Date(post.created_at), {
@@ -476,6 +517,7 @@ export default async function SinglePostPage({ params }: Props) {
                   Save it for later or share it with someone who would appreciate it.
                 </p>
                 <div className="mt-4">
+                  
                   <ShareButton title={post.title} label="Share this story" />
                 </div>
               </div>

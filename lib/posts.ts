@@ -1,10 +1,14 @@
 import { createClient } from "@/lib/server";
 
 export type PostCardAuthor = {
+  id: string;
   username: string | null;
   full_name: string | null;
   avatar_url: string | null;
+  isFollowing: boolean;
 };
+
+type RawPostAuthor = Omit<PostCardAuthor, "isFollowing">;
 
 export type PostCardCategory = {
   name: string;
@@ -23,6 +27,7 @@ export type PostCardItem = {
   cover_image_url: string | null;
   created_at: string;
   author: PostCardAuthor;
+  viewerId: string | null;
   category: PostCardCategory | null;
   tags: PostCardTag[];
   reaction_count: number;
@@ -44,7 +49,7 @@ type RawPost = {
   content: string;
   cover_image_url: string | null;
   created_at: string;
-  author: PostCardAuthor | PostCardAuthor[] | null;
+  author: RawPostAuthor | RawPostAuthor[] | null;
   category: PostCardCategory | PostCardCategory[] | null;
   post_tags: RawPostTag[] | null;
   reactions: RawCount[] | null;
@@ -85,6 +90,7 @@ export async function getPostFeed({
       cover_image_url,
       created_at,
       author:profiles!author_id (
+        id,
         username,
         full_name,
         avatar_url
@@ -194,7 +200,45 @@ export async function getPostFeed({
     throw new Error("Failed to load posts");
   }
 
-  const posts = ((data || []) as unknown as RawPost[]).map(
+  const {
+    data: { user },
+    error: authError,
+  } = await supabase.auth.getUser();
+
+  if (authError && authError.name !== "AuthSessionMissingError") {
+    console.error("Error verifying post feed viewer:", authError);
+    throw new Error("Could not verify your account.");
+  }
+
+  const rawPosts = (data || []) as unknown as RawPost[];
+  const postAuthorIds = [
+    ...new Set(
+      rawPosts.flatMap((post) => {
+        const author = Array.isArray(post.author) ? post.author[0] : post.author;
+        return author?.id ? [author.id] : [];
+      }),
+    ),
+  ];
+  let followedAuthorIds = new Set<string>();
+
+  if (user && postAuthorIds.length > 0) {
+    const { data: follows, error: followsError } = await supabase
+      .from("follows")
+      .select("following_id")
+      .eq("follower_id", user.id)
+      .in("following_id", postAuthorIds);
+
+    if (followsError) {
+      console.error("Error loading post feed follow status:", followsError);
+      throw new Error("Failed to load post follows.");
+    }
+
+    followedAuthorIds = new Set(
+      (follows || []).map((follow) => follow.following_id),
+    );
+  }
+
+  const posts = rawPosts.map(
     (post): PostCardItem => {
       const author = Array.isArray(post.author)
         ? post.author[0]
@@ -213,11 +257,19 @@ export async function getPostFeed({
         content: post.content,
         cover_image_url: post.cover_image_url,
         created_at: post.created_at,
-        author: author ?? {
-          username: null,
-          full_name: "Anonymous",
-          avatar_url: null,
-        },
+        author: author
+          ? {
+              ...author,
+              isFollowing: followedAuthorIds.has(author.id),
+            }
+          : {
+              id: "",
+              username: null,
+              full_name: "Anonymous",
+              avatar_url: null,
+              isFollowing: false,
+            },
+        viewerId: user?.id ?? null,
         category: category ?? null,
         tags,
         reaction_count: post.reactions?.[0]?.count ?? 0,

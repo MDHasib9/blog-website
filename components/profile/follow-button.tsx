@@ -9,9 +9,11 @@ import { Loader2, UserPlus, UserRoundCheck } from "lucide-react";
 export function FollowButton({
   userId,
   initiallyFollowing,
+  size = "default",
 }: {
   userId: string;
   initiallyFollowing: boolean;
+  size?: "default" | "sm";
 }) {
   const router = useRouter();
   const [following, setFollowing] = useState(initiallyFollowing);
@@ -45,6 +47,7 @@ export function FollowButton({
     <div className="flex flex-col items-center gap-2 sm:items-start">
       <Button
         variant={following ? "outline" : "default"}
+        size={size}
         onClick={handleToggle}
         disabled={isPending}
         aria-pressed={following}
