@@ -28,9 +28,22 @@ type PostCardProps = {
 };
 
 export function PostCard({ post }: PostCardProps) {
+  const plainText = post.content
+    .replace(/<script\b[^>]*>[\s\S]*?<\/script>/gi, " ")
+    .replace(/<style\b[^>]*>[\s\S]*?<\/style>/gi, " ")
+    .replace(/<[^>]+>/g, " ")
+    .replace(/&nbsp;|&#160;/gi, " ")
+    .replace(/&amp;/gi, "&")
+    .replace(/&lt;/gi, "<")
+    .replace(/&gt;/gi, ">")
+    .replace(/&quot;/gi, '"')
+    .replace(/&#39;|&apos;/gi, "'")
+    .replace(/\s+/g, " ")
+    .trim();
   const excerpt =
-    post.content.replace(/[#*`>\-\[\]()!]/g, "").slice(0, 160).trim() +
-    (post.content.length > 160 ? "..." : "");
+    plainText.slice(0, 160) + (plainText.length > 160 ? "..." : "");
+  const authorName =
+    post.author.full_name || post.author.username || "Anonymous";
 
   return (
     <article className="group flex flex-col overflow-hidden rounded-xl border bg-card transition-all hover:shadow-md">
@@ -60,9 +73,14 @@ export function PostCard({ post }: PostCardProps) {
         {/* Category + Date */}
         <div className="mb-3 flex items-center justify-between gap-2 text-sm text-muted-foreground">
           {post.category ? (
-            <Badge variant="secondary" className="font-normal">
-              {post.category.name}
-            </Badge>
+            <Link href={`/blog?category=${encodeURIComponent(post.category.slug)}`}>
+              <Badge
+                variant="secondary"
+                className="font-normal hover:bg-secondary/70"
+              >
+                {post.category.name}
+              </Badge>
+            </Link>
           ) : (
             <span />
           )}
@@ -96,20 +114,24 @@ export function PostCard({ post }: PostCardProps) {
 
         {/* Author + Stats */}
         <div className="mt-auto flex items-center justify-between border-t pt-4">
-          <Link
-            href={`/profile/${post.author.username}`}
-            className="flex items-center gap-2.5 transition-opacity hover:opacity-80"
-          >
+          <div className="flex min-w-0 items-center gap-2.5">
             <Avatar className="h-8 w-8">
-              <AvatarImage src={post.author.avatar_url || ""} />
+              <AvatarImage src={post.author.avatar_url || ""} alt={authorName} />
               <AvatarFallback>
                 {post.author.full_name?.[0] || post.author.username?.[0] || "U"}
               </AvatarFallback>
             </Avatar>
-            <span className="text-sm font-medium">
-              {post.author.full_name || post.author.username}
-            </span>
-          </Link>
+            {post.author.username ? (
+              <Link
+                href={`/profile/${encodeURIComponent(post.author.username)}`}
+                className="truncate text-sm font-medium transition-opacity hover:opacity-80"
+              >
+                {authorName}
+              </Link>
+            ) : (
+              <span className="truncate text-sm font-medium">{authorName}</span>
+            )}
+          </div>
 
           <div className="flex items-center gap-3 text-sm text-muted-foreground">
             <span className="flex items-center gap-1">

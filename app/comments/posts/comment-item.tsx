@@ -8,6 +8,7 @@ import { createComment, deleteComment } from "@/actions/comments";
 import { Loader2, Reply, Trash2 } from "lucide-react";
 import Link from "next/link";
 import { cn } from "@/lib/utils";
+import { ReportForm } from "@/components/posts/report-form";
 import {
   normalizeComment,
   type Comment,
@@ -33,6 +34,8 @@ export function CommentItem({
 }: Props) {
   const [showReply, setShowReply] = useState(false);
   const [replyContent, setReplyContent] = useState("");
+  const [replyError, setReplyError] = useState<string | null>(null);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
   const [isDeleting, startDelete] = useTransition();
   const [optimisticReplies, setOptimisticReplies] = useState<Comment[]>(
@@ -41,6 +44,21 @@ export function CommentItem({
 
   const isAuthor = currentUserId === comment.author.id;
   const maxDepth = 4; // prevent infinite nesting visually
+  const authorName =
+    comment.author.full_name || comment.author.username || "Anonymous";
+  const authorProfileHref = comment.author.username
+    ? `/profile/${encodeURIComponent(comment.author.username)}`
+    : null;
+  const authorAvatar = (
+    <Avatar className="h-9 w-9 shrink-0">
+      <AvatarImage src={comment.author.avatar_url || ""} alt={authorName} />
+      <AvatarFallback>
+        {comment.author.full_name?.[0] ||
+          comment.author.username?.[0] ||
+          "U"}
+      </AvatarFallback>
+    </Avatar>
+  );
 
   const handleDeleteReply = (commentId: string) => {
     const removeComment = (items: Comment[]): Comment[] =>
@@ -76,26 +94,40 @@ export function CommentItem({
     setOptimisticReplies((prev) => [...prev, optimistic]);
     setReplyContent("");
     setShowReply(false);
+    setReplyError(null);
     onCommentCountChange(1);
 
-    startTransition(async () => {
-      const result = await createComment(postId, trimmedReply, comment.id);
-      if (result.error) {
-        setOptimisticReplies((prev) => prev.filter((r) => r.id !== tempId));
-        onCommentCountChange(-1);
-        alert(result.error);
-      } else if (result.data) {
-        const created = normalizeComment(result.data as unknown as CommentRow);
-        if (!created) {
-          setOptimisticReplies((prev) => prev.filter((r) => r.id !== tempId));
-          onCommentCountChange(-1);
-          alert("Your reply was posted, but it could not be displayed.");
-          return;
-        }
+    const rollback = (message: string) => {
+      setOptimisticReplies((prev) =>
+        prev.filter((reply) => reply.id !== tempId),
+      );
+      onCommentCountChange(-1);
+      setReplyContent(trimmedReply);
+      setShowReply(true);
+      setReplyError(message);
+    };
 
-        setOptimisticReplies((prev) =>
-          prev.map((reply) => (reply.id === tempId ? created : reply))
-        );
+    startTransition(async () => {
+      try {
+        const result = await createComment(postId, trimmedReply, comment.id);
+        if (result.error) {
+          rollback(result.error);
+        } else if (result.data) {
+          const created = normalizeComment(result.data as unknown as CommentRow);
+          if (!created) {
+            rollback("Your reply was posted, but it could not be displayed.");
+            return;
+          }
+
+          setOptimisticReplies((prev) =>
+            prev.map((reply) => (reply.id === tempId ? created : reply)),
+          );
+        } else {
+          rollback("Could not post your reply. Please try again.");
+        }
+      } catch (error) {
+        console.error("Unexpected error posting reply:", error);
+        rollback("Could not post your reply. Please try again.");
       }
     });
   };
@@ -103,35 +135,40 @@ export function CommentItem({
   const handleDelete = () => {
     if (!confirm("Delete this comment?")) return;
 
+    setDeleteError(null);
     startDelete(async () => {
-      const result = await deleteComment(comment.id, postId);
-      if (result.error) alert(result.error);
-      else onDelete(comment.id);
+      try {
+        const result = await deleteComment(comment.id, postId);
+        if (result.error) setDeleteError(result.error);
+        else onDelete(comment.id);
+      } catch (error) {
+        console.error("Unexpected error deleting comment:", error);
+        setDeleteError("Could not delete this comment. Please try again.");
+      }
     });
   };
 
   return (
     <div className={cn("group", depth > 0 && "ml-6 border-l pl-4")}>
       <div className="flex gap-3">
-        <Link href={`/profile/${comment.author.username}`}>
-          <Avatar className="h-9 w-9 shrink-0">
-            <AvatarImage src={comment.author.avatar_url || ""} />
-            <AvatarFallback>
-              {comment.author.full_name?.[0] ||
-                comment.author.username?.[0] ||
-                "U"}
-            </AvatarFallback>
-          </Avatar>
-        </Link>
+        {authorProfileHref ? (
+          <Link href={authorProfileHref}>{authorAvatar}</Link>
+        ) : (
+          authorAvatar
+        )}
 
         <div className="flex-1 space-y-1">
           <div className="flex items-center gap-2">
-            <Link
-              href={`/profile/${comment.author.username}`}
-              className="text-sm font-medium hover:underline"
-            >
-              {comment.author.full_name || comment.author.username}
-            </Link>
+            {authorProfileHref ? (
+              <Link
+                href={authorProfileHref}
+                className="text-sm font-medium hover:underline"
+              >
+                {authorName}
+              </Link>
+            ) : (
+              <span className="text-sm font-medium">{authorName}</span>
+            )}
             <span className="text-xs text-muted-foreground">
               {formatDistanceToNow(new Date(comment.created_at), {
                 addSuffix: true,
@@ -172,14 +209,28 @@ export function CommentItem({
                 Delete
               </Button>
             )}
+            {currentUserId && !isAuthor && (
+              <ReportForm
+                commentId={comment.id}
+                currentUserId={currentUserId}
+              />
+            )}
           </div>
+          {deleteError && (
+            <p role="alert" className="text-sm text-destructive">
+              {deleteError}
+            </p>
+          )}
 
           {/* Reply form */}
           {showReply && (
             <div className="mt-3 space-y-2">
               <textarea
                 value={replyContent}
-                onChange={(e) => setReplyContent(e.target.value)}
+                onChange={(e) => {
+                  setReplyContent(e.target.value);
+                  setReplyError(null);
+                }}
                 placeholder="Write a reply..."
                 className="w-full resize-none rounded-md border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
                 rows={3}
@@ -207,6 +258,11 @@ export function CommentItem({
                   Cancel
                 </Button>
               </div>
+              {replyError && (
+                <p role="alert" className="text-sm text-destructive">
+                  {replyError}
+                </p>
+              )}
             </div>
           )}
         </div>

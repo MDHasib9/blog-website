@@ -6,7 +6,7 @@ import Placeholder from "@tiptap/extension-placeholder";
 import Image from "@tiptap/extension-image";
 import Link from "@tiptap/extension-link";
 import Underline from "@tiptap/extension-underline";
-import { useCallback, useEffect } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import {
   Bold,
@@ -24,6 +24,7 @@ import {
   Redo,
   Link as LinkIcon,
   Image as ImageIcon,
+  Loader2,
 } from "lucide-react";
 import { createClient } from "@/lib/client";
 import { cn } from "@/lib/utils";
@@ -36,6 +37,8 @@ type TiptapEditorProps = {
 
 export function TiptapEditor({ content, onChange, className }: TiptapEditorProps) {
   const supabase = createClient();
+  const [imageUploading, setImageUploading] = useState(false);
+  const [imageError, setImageError] = useState<string | null>(null);
 
   const editor = useEditor({
     extensions: [
@@ -86,24 +89,48 @@ export function TiptapEditor({ content, onChange, className }: TiptapEditorProps
       if (!input.files?.length || !editor) return;
 
       const file = input.files[0];
-      const fileExt = file.name.split(".").pop();
-      const fileName = `${crypto.randomUUID()}.${fileExt}`;
-      const filePath = `${(await supabase.auth.getUser()).data.user?.id}/${fileName}`;
-
-      const { error } = await supabase.storage
-        .from("post-images")
-        .upload(filePath, file);
-
-      if (error) {
-        console.error("Upload error:", error);
+      if (!["image/jpeg", "image/png", "image/webp", "image/gif"].includes(file.type)) {
+        setImageError("Choose a JPEG, PNG, WebP, or GIF image.");
+        input.value = "";
+        return;
+      }
+      if (file.size > 5 * 1024 * 1024) {
+        setImageError("Images must be 5 MB or smaller.");
+        input.value = "";
         return;
       }
 
-      const {
-        data: { publicUrl },
-      } = supabase.storage.from("post-images").getPublicUrl(filePath);
+      setImageError(null);
+      setImageUploading(true);
+      try {
+        const {
+          data: { user },
+          error: authError,
+        } = await supabase.auth.getUser();
 
-      editor.chain().focus().setImage({ src: publicUrl }).run();
+        if (authError) throw authError;
+        if (!user) {
+          setImageError("Log in again before uploading an image.");
+          return;
+        }
+
+        const fileExt = file.type.split("/")[1].replace("jpeg", "jpg");
+        const filePath = `${user.id}/${crypto.randomUUID()}.${fileExt}`;
+        const { error: uploadError } = await supabase.storage
+          .from("post-images")
+          .upload(filePath, file);
+        if (uploadError) throw uploadError;
+
+        const {
+          data: { publicUrl },
+        } = supabase.storage.from("post-images").getPublicUrl(filePath);
+        editor.chain().focus().setImage({ src: publicUrl }).run();
+      } catch (error) {
+        console.error("Error uploading inline image:", error);
+        setImageError("Could not upload the image. Please try again.");
+      } finally {
+        setImageUploading(false);
+      }
     };
     input.click();
   }, [editor, supabase]);
@@ -217,8 +244,16 @@ export function TiptapEditor({ content, onChange, className }: TiptapEditorProps
         <ToolbarButton onClick={setLink} active={editor.isActive("link")} title="Link">
           <LinkIcon className="h-4 w-4" />
         </ToolbarButton>
-        <ToolbarButton onClick={addImage} title="Image">
-          <ImageIcon className="h-4 w-4" />
+        <ToolbarButton
+          onClick={addImage}
+          title={imageUploading ? "Uploading image" : "Image"}
+          disabled={imageUploading}
+        >
+          {imageUploading ? (
+            <Loader2 className="h-4 w-4 animate-spin" />
+          ) : (
+            <ImageIcon className="h-4 w-4" />
+          )}
         </ToolbarButton>
 
         <div className="mx-1 h-5 w-px bg-border" />
@@ -241,6 +276,11 @@ export function TiptapEditor({ content, onChange, className }: TiptapEditorProps
 
       {/* Editor */}
       <EditorContent editor={editor} />
+      {imageError && (
+        <p role="alert" className="px-3 py-2 text-sm text-destructive">
+          {imageError}
+        </p>
+      )}
     </div>
   );
 }

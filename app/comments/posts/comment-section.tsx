@@ -49,6 +49,7 @@ export function CommentSection({ postId, currentUserId }: Props) {
   const [loadError, setLoadError] = useState<string | null>(null);
   const [reloadKey, setReloadKey] = useState(0);
   const [content, setContent] = useState("");
+  const [submitError, setSubmitError] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
 
   const handleDelete = (commentId: string) => {
@@ -117,7 +118,9 @@ export function CommentSection({ postId, currentUserId }: Props) {
     if (!trimmed) return;
 
     if (!currentUserId) {
-      router.push("/login");
+      router.push(
+        `/auth/login?next=${encodeURIComponent(`/blog/${postId}#comments`)}`,
+      );
       return;
     }
 
@@ -139,28 +142,44 @@ export function CommentSection({ postId, currentUserId }: Props) {
     setComments((prev) => [...prev, optimistic]);
     setTotalCount((prev) => prev + 1);
     setContent("");
+    setSubmitError(null);
+
+    const rollback = () => {
+      setComments((prev) => prev.filter((comment) => comment.id !== tempId));
+      setTotalCount((prev) => Math.max(0, prev - 1));
+    };
 
     startTransition(async () => {
-      const result = await createComment(postId, trimmed);
-      if (result.error) {
-        setComments((prev) => prev.filter((c) => c.id !== tempId));
-        setTotalCount((prev) => Math.max(0, prev - 1));
-        alert(result.error);
-      } else if (result.data) {
-        const created = normalizeComment(result.data as unknown as CommentRow);
-        if (!created) {
-          setComments((prev) => prev.filter((c) => c.id !== tempId));
-          setTotalCount((prev) => Math.max(0, prev - 1));
-          setReloadKey((prev) => prev + 1);
-          alert("Your comment was posted, but it could not be displayed.");
-          return;
-        }
+      try {
+        const result = await createComment(postId, trimmed);
+        if (result.error) {
+          rollback();
+          setSubmitError(result.error);
+        } else if (result.data) {
+          const created = normalizeComment(result.data as unknown as CommentRow);
+          if (!created) {
+            rollback();
+            setReloadKey((prev) => prev + 1);
+            setSubmitError(
+              "Your comment was posted, but it could not be displayed.",
+            );
+            return;
+          }
 
-        setComments((prev) =>
-          prev.map((c) =>
-            c.id === tempId ? { ...created, replies: [] } : c
-          )
-        );
+          setComments((prev) =>
+            prev.map((comment) =>
+              comment.id === tempId ? { ...created, replies: [] } : comment,
+            ),
+          );
+        } else {
+          rollback();
+          setSubmitError("Could not post your comment. Please try again.");
+        }
+      } catch (error) {
+        console.error("Unexpected error posting comment:", error);
+        rollback();
+        setContent((previous) => previous || trimmed);
+        setSubmitError("Could not post your comment. Please try again.");
       }
     });
   };
@@ -175,7 +194,10 @@ export function CommentSection({ postId, currentUserId }: Props) {
       <div className="mb-8 space-y-3">
         <textarea
           value={content}
-          onChange={(e) => setContent(e.target.value)}
+          onChange={(e) => {
+            setContent(e.target.value);
+            setSubmitError(null);
+          }}
           placeholder={
             currentUserId ? "Write a comment..." : "Log in to leave a comment"
           }
@@ -192,6 +214,11 @@ export function CommentSection({ postId, currentUserId }: Props) {
             Post Comment
           </Button>
         </div>
+        {submitError && (
+          <p role="alert" className="text-sm text-destructive">
+            {submitError}
+          </p>
+        )}
       </div>
 
       {/* Comments list */}

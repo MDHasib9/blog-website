@@ -1,161 +1,54 @@
-import { PostCard } from "@/components/posts/post-card";
 import Link from "next/link";
+import { Search, PenSquare } from "lucide-react";
+import { PostCard } from "@/components/posts/post-card";
 import { Button } from "@/components/ui/button";
-import { PenSquare } from "lucide-react";
-import { createClient } from "@/lib/server";
+import { getPostCategories, getPostFeed } from "@/lib/posts";
 
 export const metadata = {
-  title: "Blog | Blogify",
+  title: "Explore stories",
   description: "Discover the latest posts from our community",
 };
 
-// --- TypeScript Types (Zero `any`) ---
-export type PostCardAuthor = {
-  username: string;
-  full_name: string | null;
-  avatar_url: string | null;
+type Props = {
+  searchParams: Promise<{
+    q?: string | string[];
+    category?: string | string[];
+    page?: string | string[];
+  }>;
 };
 
-export type PostCardCategory = {
-  name: string;
-  slug: string;
-};
+export default async function BlogPage({ searchParams }: Props) {
+  const params = await searchParams;
+  const query = typeof params.q === "string" ? params.q.trim() : "";
+  const category = typeof params.category === "string" ? params.category : "";
+  const pageValue = typeof params.page === "string" ? Number(params.page) : 1;
+  const page = Number.isInteger(pageValue) && pageValue > 0 ? pageValue : 1;
+  const pageSize = 9;
+  const [{ posts, total }, categories] = await Promise.all([
+    getPostFeed({ search: query, category, page, pageSize }),
+    getPostCategories(),
+  ]);
+  const totalPages = Math.ceil(total / pageSize);
 
-export type PostCardTag = {
-  name: string;
-  slug: string;
-};
-
-export type PostCardItem = {
-  id: string;
-  title: string;
-  content: string;
-  cover_image_url: string | null;
-  created_at: string;
-  author: PostCardAuthor;
-  category: PostCardCategory | null;
-  tags: PostCardTag[];
-  reaction_count: number;
-  comment_count: number;
-};
-
-// Raw response shapes from Supabase joins
-type RawAuthor = PostCardAuthor | PostCardAuthor[] | null;
-type RawCategory = PostCardCategory | PostCardCategory[] | null;
-type RawTagRelation = PostCardTag | PostCardTag[] | null;
-type RawPostTag = { tag: RawTagRelation };
-type RawCount = { count: number };
-
-type RawPostListItem = {
-  id: string;
-  title: string;
-  content: string;
-  cover_image_url: string | null;
-  created_at: string;
-  author: RawAuthor;
-  category: RawCategory;
-  post_tags: RawPostTag[] | null;
-  reactions: RawCount[] | null;
-  comments: RawCount[] | null;
-};
-
-async function getPosts(): Promise<PostCardItem[]> {
-  const supabase = await createClient();
-
-  const { data, error } = await supabase
-    .from("posts")
-    .select(
-      `
-      id,
-      title,
-      content,
-      cover_image_url,
-      created_at,
-      author:profiles!author_id (
-        username,
-        full_name,
-        avatar_url
-      ),
-      category:categories (
-        name,
-        slug
-      ),
-      post_tags (
-        tag:tags (
-          name,
-          slug
-        )
-      ),
-      reactions (count),
-      comments (count)
-    `
-    )
-    .is("deleted_at", null)
-    .order("created_at", { ascending: false })
-    .limit(24);
-
-  if (error) {
-    console.error("Error fetching posts:", error);
-    throw new Error("Failed to load posts");
-  }
-
-  const rawPosts = (data || []) as unknown as RawPostListItem[];
-
-  // Normalize data shape cleanly without `any`
-  return rawPosts.map((post): PostCardItem => {
-    // Normalize author
-    const authorData = Array.isArray(post.author) ? post.author[0] : post.author;
-    const author: PostCardAuthor = authorData ?? {
-      username: "anonymous",
-      full_name: "Anonymous User",
-      avatar_url: null,
-    };
-
-    // Normalize category
-    const categoryData = Array.isArray(post.category) ? post.category[0] : post.category;
-    const category: PostCardCategory | null = categoryData ?? null;
-
-    // Normalize tags
-    const tags: PostCardTag[] = (post.post_tags || []).flatMap((pt) => {
-      if (!pt.tag) return [];
-      return Array.isArray(pt.tag) ? pt.tag : [pt.tag];
-    });
-
-    // Normalize aggregate counts
-    const reaction_count = post.reactions?.[0]?.count ?? 0;
-    const comment_count = post.comments?.[0]?.count ?? 0;
-
-    return {
-      id: post.id,
-      title: post.title,
-      content: post.content,
-      cover_image_url: post.cover_image_url,
-      created_at: post.created_at,
-      author,
-      category,
-      tags,
-      reaction_count,
-      comment_count,
-    };
-  });
-}
-
-export default async function BlogPage() {
-  const posts = await getPosts();
+  const pageHref = (targetPage: number) => {
+    const nextParams = new URLSearchParams();
+    if (query) nextParams.set("q", query);
+    if (category) nextParams.set("category", category);
+    nextParams.set("page", String(targetPage));
+    return `/blog?${nextParams.toString()}`;
+  };
 
   return (
     <div className="container mx-auto px-4 py-10">
-      {/* Header */}
       <div className="mb-10 flex flex-col items-start justify-between gap-4 sm:flex-row sm:items-center">
         <div>
           <h1 className="text-3xl font-bold tracking-tight sm:text-4xl">
-            Latest Posts
+            Explore stories
           </h1>
           <p className="mt-2 text-muted-foreground">
-            Discover stories, ideas, and insights from our community
+            Discover ideas, experiences, and perspectives from our community.
           </p>
         </div>
-
         <Button asChild>
           <Link href="/write">
             <PenSquare className="mr-2 h-4 w-4" />
@@ -164,16 +57,62 @@ export default async function BlogPage() {
         </Button>
       </div>
 
-      {/* Posts Grid */}
+      <form
+        action="/blog"
+        className="mb-8 grid gap-3 rounded-xl border bg-card p-4 sm:grid-cols-[1fr_14rem_auto]"
+      >
+        <label className="sr-only" htmlFor="blog-search">
+          Search stories
+        </label>
+        <div className="relative">
+          <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+          <input
+            id="blog-search"
+            name="q"
+            type="search"
+            defaultValue={query}
+            placeholder="Search stories and ideas"
+            className="h-10 w-full rounded-lg border bg-background pl-9 pr-3 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring"
+          />
+        </div>
+        <label className="sr-only" htmlFor="blog-category">
+          Filter by category
+        </label>
+        <select
+          id="blog-category"
+          name="category"
+          defaultValue={category}
+          className="h-10 rounded-lg border bg-background px-3 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring"
+        >
+          <option value="">All topics</option>
+          {categories.map((item) => (
+            <option key={item.id} value={item.slug}>
+              {item.name}
+            </option>
+          ))}
+        </select>
+        <Button type="submit">Search</Button>
+      </form>
+
       {posts.length === 0 ? (
         <div className="flex flex-col items-center justify-center rounded-xl border border-dashed py-24 text-center">
-          <h2 className="text-xl font-semibold">No posts yet</h2>
+          <h2 className="text-xl font-semibold">
+            {query || category ? "No matching stories" : "No stories yet"}
+          </h2>
           <p className="mt-2 max-w-sm text-muted-foreground">
-            Be the first to share something with the community.
+            {query || category
+              ? "Try another search or choose a different topic."
+              : "Be the first to share something with the community."}
           </p>
-          <Button asChild className="mt-6">
-            <Link href="/write">Create your first post</Link>
-          </Button>
+          {query || category ? (
+            <Button variant="outline" asChild className="mt-6">
+              <Link href="/blog">Clear filters</Link>
+            </Button>
+          ) : (
+            <Button asChild className="mt-6">
+              <Link href="/write">Create your first post</Link>
+            </Button>
+          )}
         </div>
       ) : (
         <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
@@ -181,6 +120,35 @@ export default async function BlogPage() {
             <PostCard key={post.id} post={post} />
           ))}
         </div>
+      )}
+
+      {totalPages > 1 && (
+        <nav
+          aria-label="Post pages"
+          className="mt-10 flex items-center justify-center gap-3"
+        >
+          {page > 1 ? (
+            <Button variant="outline" asChild>
+              <Link href={pageHref(page - 1)}>Previous</Link>
+            </Button>
+          ) : (
+            <Button variant="outline" disabled>
+              Previous
+            </Button>
+          )}
+          <span className="text-sm text-muted-foreground">
+            Page {page} of {totalPages}
+          </span>
+          {page < totalPages ? (
+            <Button variant="outline" asChild>
+              <Link href={pageHref(page + 1)}>Next</Link>
+            </Button>
+          ) : (
+            <Button variant="outline" disabled>
+              Next
+            </Button>
+          )}
+        </nav>
       )}
     </div>
   );

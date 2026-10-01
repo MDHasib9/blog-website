@@ -3,9 +3,11 @@
 import { useState, useTransition, useRef, useEffect } from "react";
 import { toggleReaction } from "@/actions/reactions";
 import { Button } from "@/components/ui/button";
-import { Bookmark, Flag, MessageCircle, Heart } from "lucide-react";
+import { MessageCircle, Heart } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useRouter } from "next/navigation";
+import { BookmarkButton } from "@/components/posts/bookmark-button";
+import { ReportForm } from "@/components/posts/report-form";
 
 const REACTIONS = [
   { type: "like", emoji: "👍", label: "Like", color: "text-blue-500" },
@@ -26,6 +28,8 @@ type Props = {
   commentCount: number;
   currentUserId?: string;
   userReaction?: ReactionType | null;
+  postAuthorId: string;
+  initiallySaved: boolean;
 };
 
 export function PostActions({
@@ -35,6 +39,8 @@ export function PostActions({
   commentCount,
   currentUserId,
   userReaction: initialUserReaction = null,
+  postAuthorId,
+  initiallySaved,
 }: Props) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
@@ -44,6 +50,7 @@ export function PostActions({
     initialUserReaction,
   );
   const [showPicker, setShowPicker] = useState(false);
+  const [actionError, setActionError] = useState<string | null>(null);
 
   const containerRef = useRef<HTMLDivElement | null>(null);
   const timerRef = useRef<NodeJS.Timeout | null>(null);
@@ -96,40 +103,51 @@ export function PostActions({
 
   const handleReaction = (type: ReactionType) => {
     if (!currentUserId) {
-      router.push("/login");
+      router.push(
+        `/auth/login?next=${encodeURIComponent(`/blog/${postId}`)}`,
+      );
       return;
     }
 
-    // Optimistic update
     const prevReaction = userReaction;
     const prevCounts = { ...counts };
     const prevTotal = total;
+    const removingReaction = prevReaction === type;
+    const nextCounts = { ...counts };
 
-    setCounts((prev) => {
-      const next = { ...prev };
-      if (prevReaction) {
-        next[prevReaction] = Math.max(0, (next[prevReaction] || 0) - 1);
-      }
-      if (prevReaction === type) {
-        // removing reaction
-        setUserReaction(null);
-        setTotal((t) => Math.max(0, t - 1));
-      } else {
-        next[type] = (next[type] || 0) + 1;
-        setUserReaction(type);
-        if (!prevReaction) setTotal((t) => t + 1);
-      }
-      return next;
-    });
+    if (prevReaction) {
+      nextCounts[prevReaction] = Math.max(
+        0,
+        (nextCounts[prevReaction] || 0) - 1,
+      );
+    }
+    if (!removingReaction) {
+      nextCounts[type] = (nextCounts[type] || 0) + 1;
+    }
+
+    setCounts(nextCounts);
+    setUserReaction(removingReaction ? null : type);
+    setTotal(
+      removingReaction
+        ? Math.max(0, prevTotal - 1)
+        : prevTotal + (prevReaction ? 0 : 1),
+    );
+    setActionError(null);
+
+    const rollback = (message: string) => {
+      setCounts(prevCounts);
+      setTotal(prevTotal);
+      setUserReaction(prevReaction);
+      setActionError(message);
+    };
 
     startTransition(async () => {
-      const result = await toggleReaction(postId, type);
-      if (result?.error) {
-        // rollback
-        setCounts(prevCounts);
-        setTotal(prevTotal);
-        setUserReaction(prevReaction);
-        alert(result.error);
+      try {
+        const result = await toggleReaction(postId, type);
+        if (result?.error) rollback(result.error);
+      } catch (error) {
+        console.error("Unexpected error saving reaction:", error);
+        rollback("Could not update your reaction. Please try again.");
       }
     });
 
@@ -212,6 +230,7 @@ export function PostActions({
         variant="outline"
         size="sm"
         className="gap-2"
+        aria-label="Scroll to comments"
         onClick={() => {
           document
             .getElementById("comments")
@@ -221,18 +240,19 @@ export function PostActions({
         <MessageCircle className="h-4 w-4" />
         {commentCount}
       </Button>
-
-      {/* Bookmark */}
-      <Button variant="outline" size="sm" className="gap-2">
-        <Bookmark className="h-4 w-4" />
-        Save
-      </Button>
-
-      {/* Report */}
-      <Button variant="ghost" size="sm" className="gap-2 text-muted-foreground">
-        <Flag className="h-4 w-4" />
-        Report
-      </Button>
+      <BookmarkButton
+        postId={postId}
+        currentUserId={currentUserId}
+        initiallySaved={initiallySaved}
+      />
+      {currentUserId !== postAuthorId && (
+        <ReportForm postId={postId} currentUserId={currentUserId} />
+      )}
+      {actionError && (
+        <p role="alert" className="basis-full text-sm text-destructive">
+          {actionError}
+        </p>
+      )}
     </div>
   );
 }

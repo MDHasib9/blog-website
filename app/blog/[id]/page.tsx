@@ -8,7 +8,9 @@ import { Button } from "@/components/ui/button";
 import { formatDistanceToNow } from "date-fns";
 import { PostActions } from "@/components/posts/post-actions";
 import { CommentSection } from "@/components/posts/comment-section";
+import { DeletePostButton } from "@/components/posts/delete-post-button";
 import { postIdParamSchema } from "@/lib/zod";
+import { sanitizePostContent } from "@/lib/sanitize-post-content";
 
 // --- Reaction & Data Types ---
 export type ReactionType =
@@ -22,7 +24,7 @@ export type ReactionType =
 
 export type PostAuthor = {
   id: string;
-  username: string;
+  username: string | null;
   full_name: string | null;
   avatar_url: string | null;
   bio: string | null;
@@ -82,6 +84,7 @@ export type FormattedPost = {
   totalReactions: number;
   commentCount: number;
   userReaction: ReactionType | null;
+  isBookmarked: boolean;
 };
 
 type Props = {
@@ -109,7 +112,7 @@ export async function generateMetadata({ params }: Props) {
   if (!post) return { title: "Post not found" };
 
   return {
-    title: `${post.title} | Blogify`,
+    title: post.title,
     description: post.content.replace(/<[^>]*>/g, "").slice(0, 160),
   };
 }
@@ -203,6 +206,22 @@ async function getPost(id: string, userId?: string): Promise<FormattedPost | nul
 
   const totalReactions = reactions?.length || 0;
 
+  let isBookmarked = false;
+  if (userId) {
+    const { data: bookmark, error: bookmarkError } = await supabase
+      .from("bookmarks")
+      .select("post_id")
+      .eq("user_id", userId)
+      .eq("post_id", id)
+      .maybeSingle();
+
+    if (bookmarkError) {
+      console.error("Error checking post bookmark:", bookmarkError);
+      throw new Error("Failed to load post");
+    }
+    isBookmarked = Boolean(bookmark);
+  }
+
   // Fetch comment count
   const { count: commentCount } = await supabase
     .from("comments")
@@ -225,6 +244,7 @@ async function getPost(id: string, userId?: string): Promise<FormattedPost | nul
     totalReactions,
     commentCount: commentCount || 0,
     userReaction,
+    isBookmarked,
   };
 }
 
@@ -251,6 +271,7 @@ export default async function SinglePostPage({ params }: Props) {
   if (!post) notFound();
 
   const isAuthor = user?.id === post.author_id;
+  const authorName = post.author.full_name || post.author.username || "Anonymous";
 
   return (
     <article className="container mx-auto max-w-3xl px-4 py-10">
@@ -267,32 +288,42 @@ export default async function SinglePostPage({ params }: Props) {
         </h1>
 
         <div className="mt-6 flex items-center justify-between gap-4">
-          <Link
-            href={`/profile/${post.author.username}`}
-            className="flex items-center gap-3 transition-opacity hover:opacity-80"
-          >
+          <div className="flex items-center gap-3">
             <Avatar className="h-11 w-11">
-              <AvatarImage src={post.author.avatar_url || ""} />
+              <AvatarImage
+                src={post.author.avatar_url || ""}
+                alt={authorName}
+              />
               <AvatarFallback>
                 {post.author.full_name?.[0] || post.author.username?.[0] || "U"}
               </AvatarFallback>
             </Avatar>
-            <div>
-              <p className="font-medium">
-                {post.author.full_name || post.author.username}
-              </p>
+            <div className="min-w-0">
+              {post.author.username ? (
+                <Link
+                  href={`/profile/${encodeURIComponent(post.author.username)}`}
+                  className="font-medium hover:underline"
+                >
+                  {authorName}
+                </Link>
+              ) : (
+                <p className="font-medium">{authorName}</p>
+              )}
               <p className="text-sm text-muted-foreground">
                 {formatDistanceToNow(new Date(post.created_at), {
                   addSuffix: true,
                 })}
               </p>
             </div>
-          </Link>
+          </div>
 
           {isAuthor && (
-            <Button variant="outline" size="sm" asChild>
-              <Link href={`/posts/${post.id}/edit`}>Edit</Link>
-            </Button>
+            <div className="flex items-center gap-2">
+              <Button variant="outline" size="sm" asChild>
+                <Link href={`/posts/${post.id}/edit`}>Edit</Link>
+              </Button>
+              <DeletePostButton postId={post.id} />
+            </div>
           )}
         </div>
       </header>
@@ -314,7 +345,9 @@ export default async function SinglePostPage({ params }: Props) {
       {/* Content */}
       <div
         className="prose prose-neutral dark:prose-invert max-w-none prose-headings:font-semibold prose-a:text-primary prose-img:rounded-lg"
-        dangerouslySetInnerHTML={{ __html: post.content }}
+        dangerouslySetInnerHTML={{
+          __html: sanitizePostContent(post.content),
+        }}
       />
 
       {/* Tags */}
@@ -337,6 +370,8 @@ export default async function SinglePostPage({ params }: Props) {
           commentCount={post.commentCount}
           currentUserId={user?.id}
           userReaction={post.userReaction}
+          postAuthorId={post.author_id}
+          initiallySaved={post.isBookmarked}
         />
       </div>
 

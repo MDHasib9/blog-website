@@ -19,19 +19,29 @@ export async function createComment(
 
   const {
     data: { user },
+    error: authError,
   } = await supabase.auth.getUser();
+
+  if (authError) {
+    console.error("Error verifying comment author:", authError);
+    return { error: "Could not verify your account. Please try again." };
+  }
 
   if (!user) {
     return { error: "You must be logged in to comment." };
   }
 
   // Check user profile ban / deletion status
-  const { data: profile } = await supabase
+  const { data: profile, error: profileError } = await supabase
     .from("profiles")
     .select("is_banned, deleted_at")
     .eq("id", user.id)
     .single();
 
+  if (profileError) {
+    console.error("Error checking comment permissions:", profileError);
+    return { error: "Could not verify your account permissions." };
+  }
   if (!profile || profile.is_banned || profile.deleted_at) {
     return { error: "Your account is not allowed to comment." };
   }
@@ -51,12 +61,16 @@ export async function createComment(
 
   // Validate parent comment if nested reply
   if (validParentId) {
-    const { data: parentComment } = await supabase
+    const { data: parentComment, error: parentError } = await supabase
       .from("comments")
       .select("id, post_id, deleted_at")
       .eq("id", validParentId)
-      .single();
+      .maybeSingle();
 
+    if (parentError) {
+      console.error("Error checking parent comment:", parentError);
+      return { error: "Could not verify the comment you are replying to." };
+    }
     if (!parentComment || parentComment.post_id !== validPostId || parentComment.deleted_at) {
       return { error: "The comment you are replying to no longer exists." };
     }
@@ -97,27 +111,43 @@ export async function createComment(
 }
 
 export async function deleteComment(commentId: string, postId: string) {
+  const parsedCommentId = z.string().uuid().safeParse(commentId);
+  const parsedPostId = z.string().uuid().safeParse(postId);
+  if (!parsedCommentId.success || !parsedPostId.success) {
+    return { error: "Invalid comment." };
+  }
+
   const supabase = await createClient();
 
   const {
     data: { user },
+    error: authError,
   } = await supabase.auth.getUser();
+
+  if (authError) {
+    console.error("Error verifying comment author:", authError);
+    return { error: "Could not verify your account. Please try again." };
+  }
 
   if (!user) return { error: "Unauthorized" };
 
-  // Soft Delete
   const { data, error } = await supabase
     .from("comments")
     .update({ deleted_at: new Date().toISOString() })
-    .eq("id", commentId)
+    .eq("id", parsedCommentId.data)
+    .eq("post_id", parsedPostId.data)
     .eq("author_id", user.id)
     .select("id")
-    .single();
+    .maybeSingle();
 
-  if (error || !data) {
+  if (error) {
+    console.error("Error deleting comment:", error);
+    return { error: "Failed to delete comment. Please try again." };
+  }
+  if (!data) {
     return { error: "Failed to delete comment or permission denied." };
   }
 
-  revalidatePath(`/blog/${postId}`);
+  revalidatePath(`/blog/${parsedPostId.data}`);
   return { success: true };
 }

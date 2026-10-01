@@ -44,14 +44,20 @@ export async function updateSession(request: NextRequest) {
 
   const isPublic =
     pathname === "/" ||
-    pathname.startsWith("/auth/login") ||
-    pathname.startsWith("/auth/sign-up") ||
-    pathname.startsWith("/blog");
-  // no user, potentially respond by redirecting the user to the login page
+    pathname === "/search" ||
+    pathname === "/blog" ||
+    pathname.startsWith("/blog/") ||
+    pathname.startsWith("/profile/") ||
+    pathname.startsWith("/auth/");
 
   if (!user && !isPublic) {
     const url = request.nextUrl.clone();
     url.pathname = "/auth/login";
+    url.search = "";
+    url.searchParams.set(
+      "next",
+      `${pathname}${request.nextUrl.search}`,
+    );
     return NextResponse.redirect(url);
   }
 

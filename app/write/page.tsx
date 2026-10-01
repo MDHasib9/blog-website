@@ -3,7 +3,7 @@ import { redirect } from "next/navigation";
 import { WriteForm } from "@/components/posts/write-form";
 
 export const metadata = {
-  title: "Write a Post | Blogify",
+  title: "Write a post",
 };
 
 export default async function WritePage() {
@@ -14,7 +14,7 @@ export default async function WritePage() {
   } = await supabase.auth.getUser();
 
   if (!user) {
-    redirect("/login?next=/write");
+    redirect("/auth/login?next=%2Fwrite");
   }
 
   // Check banned

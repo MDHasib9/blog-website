@@ -1,7 +1,12 @@
 "use client";
 
 import { useActionState, useState } from "react";
-import { createPost, type CreatePostState } from "@/actions/post";
+import Link from "next/link";
+import {
+  createPost,
+  updatePost,
+  type CreatePostState,
+} from "@/actions/post";
 import { TiptapEditor } from "@/components/editor/tiptap-editor";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -22,17 +27,35 @@ type Category = {
   name: string;
 };
 
-export function WriteForm({ categories }: { categories: Category[] }) {
+type InitialPost = {
+  id: string;
+  title: string;
+  content: string;
+  cover_image_url: string | null;
+  category_id: string | null;
+};
+
+export function WriteForm({
+  categories,
+  initialPost,
+}: {
+  categories: Category[];
+  initialPost?: InitialPost;
+}) {
+  const action = initialPost
+    ? updatePost.bind(null, initialPost.id)
+    : createPost;
   const [state, formAction, isPending] = useActionState<CreatePostState, FormData>(
-    createPost,
+    action,
     {}
   );
 
-  const [title, setTitle] = useState("");
-  const [content, setContent] = useState("");
-  const [coverUrl, setCoverUrl] = useState("");
+  const [title, setTitle] = useState(initialPost?.title || "");
+  const [content, setContent] = useState(initialPost?.content || "");
+  const [coverUrl, setCoverUrl] = useState(initialPost?.cover_image_url || "");
   const [uploading, setUploading] = useState(false);
-  const [categoryId, setCategoryId] = useState("");
+  const [uploadError, setUploadError] = useState<string | null>(null);
+  const [categoryId, setCategoryId] = useState(initialPost?.category_id || "");
   const [tags, setTags] = useState("");
 
   const supabase = createClient();
@@ -41,14 +64,30 @@ export function WriteForm({ categories }: { categories: Category[] }) {
     const file = e.target.files?.[0];
     if (!file) return;
 
+    if (!["image/jpeg", "image/png", "image/webp", "image/gif"].includes(file.type)) {
+      setUploadError("Choose a JPEG, PNG, WebP, or GIF image.");
+      e.target.value = "";
+      return;
+    }
+
+    if (file.size > 5 * 1024 * 1024) {
+      setUploadError("Cover images must be 5 MB or smaller.");
+      e.target.value = "";
+      return;
+    }
+
+    setUploadError(null);
     setUploading(true);
     try {
       const {
         data: { user },
       } = await supabase.auth.getUser();
-      if (!user) return;
+      if (!user) {
+        setUploadError("Log in again before uploading an image.");
+        return;
+      }
 
-      const fileExt = file.name.split(".").pop();
+      const fileExt = file.type.split("/")[1].replace("jpeg", "jpg");
       const fileName = `cover-${crypto.randomUUID()}.${fileExt}`;
       const filePath = `${user.id}/${fileName}`;
 
@@ -64,8 +103,8 @@ export function WriteForm({ categories }: { categories: Category[] }) {
 
       setCoverUrl(publicUrl);
     } catch (err) {
-      console.error(err);
-      alert("Failed to upload cover image");
+      console.error("Error uploading cover image:", err);
+      setUploadError("Could not upload the image. Please try again.");
     } finally {
       setUploading(false);
     }
@@ -97,7 +136,7 @@ export function WriteForm({ categories }: { categories: Category[] }) {
 
       {/* Cover Image */}
       <div className="space-y-2">
-        <Label>Cover Image (optional)</Label>
+        <Label htmlFor="cover-image">Cover image (optional)</Label>
         {coverUrl ? (
           <div className="relative aspect-video w-full max-w-2xl overflow-hidden rounded-lg border">
             <Image src={coverUrl} alt="Cover" fill className="object-cover" />
@@ -106,7 +145,11 @@ export function WriteForm({ categories }: { categories: Category[] }) {
               variant="destructive"
               size="icon"
               className="absolute right-2 top-2"
-              onClick={() => setCoverUrl("")}
+              onClick={() => {
+                setCoverUrl("");
+                setUploadError(null);
+              }}
+              aria-label="Remove cover image"
             >
               <X className="h-4 w-4" />
             </Button>
@@ -118,13 +161,19 @@ export function WriteForm({ categories }: { categories: Category[] }) {
               {uploading ? "Uploading..." : "Click to upload cover image"}
             </span>
             <input
+              id="cover-image"
               type="file"
-              accept="image/*"
+              accept="image/jpeg,image/png,image/webp,image/gif"
               className="hidden"
               onChange={handleCoverUpload}
               disabled={uploading}
             />
           </label>
+        )}
+        {uploadError && (
+          <p role="alert" className="text-sm text-destructive">
+            {uploadError}
+          </p>
         )}
       </div>
 
@@ -146,16 +195,22 @@ export function WriteForm({ categories }: { categories: Category[] }) {
           </Select>
         </div>
 
-        <div className="space-y-2">
-          <Label htmlFor="tags">Tags (comma separated)</Label>
-          <Input
-            id="tags"
-            name="tags"
-            value={tags}
-            onChange={(e) => setTags(e.target.value)}
-            placeholder="nextjs, react, tutorial"
-          />
-        </div>
+        {!initialPost && (
+          <div className="space-y-2">
+            <Label htmlFor="tags">Tags (comma separated)</Label>
+            <Input
+              id="tags"
+              name="tags"
+              value={tags}
+              onChange={(e) => setTags(e.target.value)}
+              placeholder="nextjs, react, tutorial"
+              maxLength={500}
+            />
+            {state.errors?.tags && (
+              <p className="text-sm text-destructive">{state.errors.tags[0]}</p>
+            )}
+          </div>
+        )}
       </div>
 
       {/* Editor */}
@@ -176,12 +231,17 @@ export function WriteForm({ categories }: { categories: Category[] }) {
 
       {/* Submit */}
       <div className="flex justify-end gap-3">
-        <Button type="button" variant="outline" disabled={isPending}>
+        <Button type="button" variant="outline" asChild>
+          <Link href={initialPost ? `/blog/${initialPost.id}` : "/blog"}>
           Cancel
+          </Link>
         </Button>
-        <Button type="submit" disabled={isPending || !title || !content}>
+        <Button
+          type="submit"
+          disabled={isPending || uploading || !title.trim() || !content.trim()}
+        >
           {isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-          Publish Post
+          {initialPost ? "Save changes" : "Publish story"}
         </Button>
       </div>
     </form>

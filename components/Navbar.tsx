@@ -15,16 +15,17 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
+import type { User as SupabaseUser } from "@supabase/supabase-js";
 import {
   Menu,
   Search,
   PenSquare,
+  LogOut,
+  User,
   Bookmark,
   Bell,
-  Settings,
-  LogOut,
-  LayoutDashboard,
-  User,
+  ShieldCheck,
+  Users,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { ModeToggle } from "./theme/mode-toggle";
@@ -40,8 +41,9 @@ type Profile = {
 export function Navbar() {
   const pathname = usePathname();
   const router = useRouter();
-  const [user, setUser] = useState<any>(null);
+  const [user, setUser] = useState<SupabaseUser | null>(null);
   const [profile, setProfile] = useState<Profile | null>(null);
+  const [unreadCount, setUnreadCount] = useState(0);
   const [loading, setLoading] = useState(true);
   const [mobileOpen, setMobileOpen] = useState(false);
 
@@ -69,8 +71,21 @@ export function Navbar() {
           if (isMounted) {
             setProfile(data);
           }
+
+          const { count, error: notificationError } = await supabase
+            .from("notifications")
+            .select("id", { count: "exact", head: true })
+            .eq("user_id", user.id)
+            .eq("is_read", false);
+
+          if (notificationError) {
+            console.error("Error loading unread notification count:", notificationError);
+          } else if (isMounted) {
+            setUnreadCount(count ?? 0);
+          }
         } else {
           setProfile(null);
+          setUnreadCount(0);
         }
       } catch (error) {
         console.error("Error fetching user/profile:", error);
@@ -89,6 +104,7 @@ export function Navbar() {
       setUser(session?.user ?? null);
       if (!session?.user) {
         setProfile(null);
+        setUnreadCount(0);
         setLoading(false);
       } else {
         fetchUserData();
@@ -147,7 +163,7 @@ export function Navbar() {
         <div className="flex items-center gap-2">
           {/* Search */}
           <Button variant="ghost" size="icon" asChild>
-            <Link href="/search">
+            <Link href="/search" aria-label="Search stories" title="Search stories">
               <Search className="h-5 w-5" />
             </Link>
           </Button>
@@ -200,7 +216,7 @@ export function Navbar() {
                 <DropdownMenuSeparator />
                 {profile?.username && (
                   <DropdownMenuItem asChild>
-                    <Link href={`/profile/${profile.username}`}>
+                    <Link href={`/profile/${encodeURIComponent(profile.username)}`}>
                       <User className="mr-2 h-4 w-4" />
                       Profile
                     </Link>
@@ -209,31 +225,33 @@ export function Navbar() {
                 <DropdownMenuItem asChild>
                   <Link href="/bookmarks">
                     <Bookmark className="mr-2 h-4 w-4" />
-                    Bookmarks
+                    Saved stories
                   </Link>
                 </DropdownMenuItem>
                 <DropdownMenuItem asChild>
                   <Link href="/notifications">
                     <Bell className="mr-2 h-4 w-4" />
                     Notifications
+                    {unreadCount > 0 && (
+                      <span className="ml-auto rounded-full bg-primary px-2 py-0.5 text-xs text-primary-foreground">
+                        {unreadCount > 99 ? "99+" : unreadCount}
+                      </span>
+                    )}
                   </Link>
                 </DropdownMenuItem>
                 <DropdownMenuItem asChild>
-                  <Link href="/settings">
-                    <Settings className="mr-2 h-4 w-4" />
-                    Settings
+                  <Link href="/following">
+                    <Users className="mr-2 h-4 w-4" />
+                    Following
                   </Link>
                 </DropdownMenuItem>
                 {profile?.role === "admin" && (
-                  <>
-                    <DropdownMenuSeparator />
-                    <DropdownMenuItem asChild>
-                      <Link href="/admin">
-                        <LayoutDashboard className="mr-2 h-4 w-4" />
-                        Admin
-                      </Link>
-                    </DropdownMenuItem>
-                  </>
+                  <DropdownMenuItem asChild>
+                    <Link href="/admin">
+                      <ShieldCheck className="mr-2 h-4 w-4" />
+                      Moderation
+                    </Link>
+                  </DropdownMenuItem>
                 )}
                 <DropdownMenuSeparator />
                 <DropdownMenuItem
@@ -260,7 +278,11 @@ export function Navbar() {
           {/* Mobile menu */}
           <Sheet open={mobileOpen} onOpenChange={setMobileOpen}>
             <SheetTrigger asChild className="md:hidden">
-              <Button variant="ghost" size="icon">
+              <Button
+                variant="ghost"
+                size="icon"
+                aria-label="Open navigation menu"
+              >
                 <Menu className="h-5 w-5" />
               </Button>
             </SheetTrigger>
@@ -286,26 +308,40 @@ export function Navbar() {
                     >
                       Write
                     </Link>
+                    {profile?.username && (
+                      <Link
+                        href={`/profile/${encodeURIComponent(profile.username)}`}
+                        onClick={() => setMobileOpen(false)}
+                        className="text-lg font-medium"
+                      >
+                        My profile
+                      </Link>
+                    )}
                     <Link
                       href="/bookmarks"
                       onClick={() => setMobileOpen(false)}
                       className="text-lg font-medium"
                     >
-                      Bookmarks
+                      Saved stories
                     </Link>
                     <Link
                       href="/notifications"
                       onClick={() => setMobileOpen(false)}
-                      className="text-lg font-medium"
+                      className="flex items-center gap-2 text-lg font-medium"
                     >
                       Notifications
+                      {unreadCount > 0 && (
+                        <span className="rounded-full bg-primary px-2 py-0.5 text-xs text-primary-foreground">
+                          {unreadCount > 99 ? "99+" : unreadCount}
+                        </span>
+                      )}
                     </Link>
                     <Link
-                      href="/settings"
+                      href="/following"
                       onClick={() => setMobileOpen(false)}
                       className="text-lg font-medium"
                     >
-                      Settings
+                      Following
                     </Link>
                     {profile?.role === "admin" && (
                       <Link
@@ -313,7 +349,7 @@ export function Navbar() {
                         onClick={() => setMobileOpen(false)}
                         className="text-lg font-medium"
                       >
-                        Admin
+                        Moderation
                       </Link>
                     )}
                     <Button
