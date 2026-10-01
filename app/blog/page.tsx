@@ -6,7 +6,7 @@ import { getPostCategories, getPostFeed } from "@/lib/posts";
 
 export const metadata = {
   title: "Explore stories",
-  description: "Discover the latest posts from our community",
+  description: "Discover the latest stories from our community.",
 };
 
 type Props = {
@@ -52,7 +52,7 @@ export default async function BlogPage({ searchParams }: Props) {
         <Button asChild>
           <Link href="/write">
             <PenSquare className="mr-2 h-4 w-4" />
-            Write a post
+            Write a story
           </Link>
         </Button>
       </div>
@@ -110,7 +110,7 @@ export default async function BlogPage({ searchParams }: Props) {
             </Button>
           ) : (
             <Button asChild className="mt-6">
-              <Link href="/write">Create your first post</Link>
+              <Link href="/write">Create your first story</Link>
             </Button>
           )}
         </div>

@@ -47,8 +47,7 @@ export function Navbar() {
   const [unreadCount, setUnreadCount] = useState(0);
   const [loading, setLoading] = useState(true);
   const [mobileOpen, setMobileOpen] = useState(false);
-
-  const supabase = createClient();
+  const [supabase] = useState(createClient);
 
   useEffect(() => {
     let isMounted = true;
@@ -207,7 +206,7 @@ export function Navbar() {
               asChild
               className="hidden sm:flex"
             >
-              <Link href="/write">
+              <Link href="/write" aria-label="Write a story" title="Write a story">
                 <PenSquare className="h-5 w-5" />
               </Link>
             </Button>
@@ -222,6 +221,7 @@ export function Navbar() {
                 <Button
                   variant="ghost"
                   className="relative h-9 w-9 rounded-full"
+                  aria-label="Open account menu"
                 >
                   <Avatar className="h-9 w-9">
                     <AvatarImage src={profile?.avatar_url || ""} />
@@ -298,14 +298,14 @@ export function Navbar() {
                   className="text-red-600"
                 >
                   <LogOut className="mr-2 h-4 w-4" />
-                  Log out
+                  Sign out
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
           ) : (
             <div className="hidden sm:flex items-center gap-2">
               <Button variant="ghost" asChild>
-                <Link href="/auth/login">Log in</Link>
+                <Link href="/auth/login">Sign in</Link>
               </Button>
               <Button asChild>
                 <Link href="/auth/sign-up">Sign up</Link>
@@ -407,7 +407,7 @@ export function Navbar() {
                         setMobileOpen(false);
                       }}
                     >
-                      Log out
+                      Sign out
                     </Button>
                   </>
                 ) : (
@@ -417,7 +417,7 @@ export function Navbar() {
                         href="/auth/login"
                         onClick={() => setMobileOpen(false)}
                       >
-                        Log in
+                        Sign in
                       </Link>
                     </Button>
                     <Button asChild>

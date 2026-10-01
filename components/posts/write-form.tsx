@@ -83,7 +83,7 @@ export function WriteForm({
         data: { user },
       } = await supabase.auth.getUser();
       if (!user) {
-        setUploadError("Log in again before uploading an image.");
+        setUploadError("Sign in again before uploading an image.");
         return;
       }
 

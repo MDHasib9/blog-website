@@ -3,7 +3,7 @@ import { redirect } from "next/navigation";
 import { WriteForm } from "@/components/posts/write-form";
 
 export const metadata = {
-  title: "Write a post",
+  title: "Write a story",
 };
 
 export default async function WritePage() {
@@ -37,7 +37,7 @@ export default async function WritePage() {
   return (
     <div className="container mx-auto max-w-4xl px-4 py-10">
       <div className="mb-8">
-        <h1 className="text-3xl font-bold tracking-tight">Write a new post</h1>
+        <h1 className="text-3xl font-bold tracking-tight">Write a new story</h1>
         <p className="mt-2 text-muted-foreground">
           Share your ideas with the community
         </p>

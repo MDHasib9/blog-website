@@ -337,13 +337,13 @@ export default async function AdminPage() {
       icon: Users,
     },
     {
-      label: "Total posts",
+      label: "Total stories",
       value: postsCountResult.count || 0,
       description: "Published stories",
       icon: FileText,
     },
     {
-      label: "Posts this week",
+      label: "Stories this week",
       value: recentPostsResult.count || 0,
       description: "Published in the last 7 days",
       icon: CalendarDays,
@@ -384,7 +384,7 @@ export default async function AdminPage() {
           variant={pendingCount ? "destructive" : "secondary"}
           className="ml-auto"
         >
-          {pendingCount} pending
+          {pendingCount} pending {pendingCount === 1 ? "report" : "reports"}
         </Badge>
       </header>
 

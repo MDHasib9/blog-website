@@ -21,14 +21,14 @@ export default function SinglePostError({
       <div className="mb-6 rounded-full bg-destructive/10 p-4">
         <AlertCircle className="h-10 w-10 text-destructive" />
       </div>
-      <h2 className="mb-2 text-2xl font-bold">Failed to load post</h2>
+      <h2 className="mb-2 text-2xl font-bold">Failed to load story</h2>
       <p className="mb-8 max-w-md text-muted-foreground">
-        Something went wrong while loading this post.
+        Something went wrong while loading this story.
       </p>
       <div className="flex gap-3">
         <Button onClick={reset}>Try again</Button>
         <Button variant="outline" asChild>
-          <Link href="/blog">Back to Blog</Link>
+          <Link href="/blog">Back to stories</Link>
         </Button>
       </div>
     </div>

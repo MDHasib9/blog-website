@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Loader2 } from "lucide-react";
 import { createClient } from "@/lib/client";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import {
   normalizeComment,
   type Comment,
@@ -192,27 +193,43 @@ export function CommentSection({ postId, currentUserId }: Props) {
 
       {/* New comment form */}
       <div className="mb-8 space-y-3">
+        <label className="sr-only" htmlFor={`comment-${postId}`}>
+          Write a comment
+        </label>
         <textarea
+          id={`comment-${postId}`}
           value={content}
           onChange={(e) => {
             setContent(e.target.value);
             setSubmitError(null);
           }}
           placeholder={
-            currentUserId ? "Write a comment..." : "Log in to leave a comment"
+            currentUserId ? "Write a comment..." : "Sign in to leave a comment"
           }
           disabled={!currentUserId}
           className="w-full resize-none rounded-lg border bg-background px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-ring disabled:opacity-60"
           rows={4}
         />
         <div className="flex justify-end">
-          <Button
-            onClick={handleSubmit}
-            disabled={isPending || !content.trim() || !currentUserId}
-          >
-            {isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-            Post Comment
-          </Button>
+          {currentUserId ? (
+            <Button
+              onClick={handleSubmit}
+              disabled={isPending || !content.trim()}
+            >
+              {isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              Post comment
+            </Button>
+          ) : (
+            <Button asChild variant="outline">
+              <Link
+                href={`/auth/login?next=${encodeURIComponent(
+                  `/blog/${postId}#comments`,
+                )}`}
+              >
+                Sign in to comment
+              </Link>
+            </Button>
+          )}
         </div>
         {submitError && (
           <p role="alert" className="text-sm text-destructive">

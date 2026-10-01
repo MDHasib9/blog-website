@@ -140,14 +140,20 @@ export default async function FollowingPage() {
         ) : (
           <div className="rounded-xl border border-dashed px-6 py-16 text-center">
             <h3 className="text-xl font-semibold">
-              You&apos;re not following anyone yet
+              {followingCount
+                ? "No followed authors are available"
+                : "You're not following anyone yet"}
             </h3>
             <p className="mt-2 text-muted-foreground">
-              Visit an author&apos;s profile and follow them to stay connected.
+              {followingCount
+                ? "The authors you followed may have removed their profiles."
+                : "Visit an author's profile and follow them to stay connected."}
             </p>
-            <Button className="mt-5" asChild>
-              <Link href="/blog">Discover authors</Link>
-            </Button>
+            {!followingCount && (
+              <Button className="mt-5" asChild>
+                <Link href="/blog">Discover authors</Link>
+              </Button>
+            )}
           </div>
         )}
       </section>
@@ -174,9 +180,15 @@ export default async function FollowingPage() {
           </div>
         ) : (
           <div className="rounded-xl border border-dashed px-6 py-12 text-center">
-            <h3 className="font-semibold">No new stories yet</h3>
+            <h3 className="font-semibold">
+              {(followingCount ?? 0) > 0
+                ? "No stories from followed authors yet"
+                : "Follow authors to build your feed"}
+            </h3>
             <p className="mt-2 text-sm text-muted-foreground">
-              Stories from authors you follow will appear here.
+              {(followingCount ?? 0) > 0
+                ? "Stories from authors you follow will appear here."
+                : "Follow authors to see their stories here."}
             </p>
             {(followingCount ?? 0) === 0 && (
               <Button className="mt-5" asChild>

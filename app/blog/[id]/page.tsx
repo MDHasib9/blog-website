@@ -99,7 +99,7 @@ export async function generateMetadata({ params }: Props) {
   
   const parsed = postIdParamSchema.safeParse(rawParams);
   if (!parsed.success) {
-    return { title: "Post not found" };
+    return { title: "Story not found" };
   }
 
   const { id } = parsed.data;
@@ -112,7 +112,7 @@ export async function generateMetadata({ params }: Props) {
     .is("deleted_at", null)
     .single();
 
-  if (!post) return { title: "Post not found" };
+  if (!post) return { title: "Story not found" };
 
   return {
     title: post.title,

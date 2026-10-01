@@ -22,7 +22,7 @@ export default function BlogError({
       </div>
       <h2 className="mb-2 text-2xl font-bold">Something went wrong</h2>
       <p className="mb-8 max-w-md text-muted-foreground">
-        We couldn’t load the posts right now. Please try again.
+        We couldn’t load the stories right now. Please try again.
       </p>
       <Button onClick={reset}>Try again</Button>
     </div>

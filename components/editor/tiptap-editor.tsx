@@ -36,7 +36,7 @@ type TiptapEditorProps = {
 };
 
 export function TiptapEditor({ content, onChange, className }: TiptapEditorProps) {
-  const supabase = createClient();
+  const [supabase] = useState(createClient);
   const [imageUploading, setImageUploading] = useState(false);
   const [imageError, setImageError] = useState<string | null>(null);
 
@@ -110,7 +110,7 @@ export function TiptapEditor({ content, onChange, className }: TiptapEditorProps
 
         if (authError) throw authError;
         if (!user) {
-          setImageError("Log in again before uploading an image.");
+          setImageError("Sign in again before uploading an image.");
           return;
         }
 
