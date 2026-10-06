@@ -79,7 +79,10 @@ export function Navbar() {
             .eq("is_read", false);
 
           if (notificationError) {
-            console.error("Error loading unread notification count:", notificationError);
+            console.error(
+              "Error loading unread notification count:",
+              notificationError,
+            );
           } else if (isMounted) {
             setUnreadCount(count ?? 0);
           }
@@ -193,7 +196,11 @@ export function Navbar() {
         <div className="flex items-center gap-2">
           {/* Search */}
           <Button variant="ghost" size="icon" asChild>
-            <Link href="/search" aria-label="Search stories" title="Search stories">
+            <Link
+              href="/search"
+              aria-label="Search stories"
+              title="Search stories"
+            >
               <Search className="h-5 w-5" />
             </Link>
           </Button>
@@ -206,7 +213,11 @@ export function Navbar() {
               asChild
               className="hidden sm:flex"
             >
-              <Link href="/write" aria-label="Write a story" title="Write a story">
+              <Link
+                href="/write"
+                aria-label="Write a story"
+                title="Write a story"
+              >
                 <PenSquare className="h-5 w-5" />
               </Link>
             </Button>
@@ -248,7 +259,9 @@ export function Navbar() {
                 {profile?.username && (
                   <>
                     <DropdownMenuItem asChild>
-                      <Link href={`/profile/${encodeURIComponent(profile.username)}`}>
+                      <Link
+                        href={`/profile/${encodeURIComponent(profile.username)}`}
+                      >
                         <User className="mr-2 h-4 w-4" />
                         Profile
                       </Link>
@@ -326,13 +339,13 @@ export function Navbar() {
               </Button>
             </SheetTrigger>
             <SheetContent side="right" className="w-72">
-              <div className="flex flex-col gap-4 mt-8">
+              <div className="flex p-8  flex-col gap-4 mt-8">
                 {navLinks.map((link) => (
                   <Link
                     key={link.href}
                     href={link.href}
                     onClick={() => setMobileOpen(false)}
-                    className="text-lg font-medium"
+                    className="text-lg  font-medium"
                   >
                     {link.label}
                   </Link>
